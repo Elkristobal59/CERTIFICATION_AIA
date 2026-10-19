@@ -1,34 +1,41 @@
-# 💳 Bloc 3 — Concevoir & Mettre en Œuvre un Pipeline de Données pour l'IA (Real-Time Fraud Detection) ⚡
+# 💳 Real-Time Fraud Detection & Streaming Analytics Pipeline
 
-> **Titre Officiel :** Architecte en Intelligence Artificielle (Niveau 7 - Bac+5, RNCP 41993)  
-> **Bloc de Compétence :** Bloc 3 — Déploiement de Pipelines de Transformation & Streaming pour l'IA  
-> **Étude de Cas Officielle :** Automatic Fraud Detection 🥷  
-> **Auteur & Candidat :** Chris GILLERON  
-> **Dépôt GitHub Officiel :** [https://github.com/Elkristobal59/CERTIFICATION_AIA](https://github.com/Elkristobal59/CERTIFICATION_AIA)  
-> **Présentation d'Architecture (Livrable 1) :** [ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx](file:///d:/AIL-FT-02/CERTIF%20AIL/FRAUD_DETECTION_BLOC_3/ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx)  
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Kafka](https://img.shields.io/badge/Apache_Kafka-KRaft_7.5-231F20?logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Airflow](https://img.shields.io/badge/Apache_Airflow-2.8+-017CEE?logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![PCI-DSS](https://img.shields.io/badge/Compliance-PCI--DSS_v4.0-success)](#-sécurité-gouvernance--conformité-pci-dss)
 
----
-
-## 🧭 1. Synthèse des 5 Compétences Évaluées par le Jury (RNCP 41993 - Bloc 3)
-
-| Compétence RNCP | Intitulé Officiel | Implémentation Industrielle dans ce Projet |
-| :--- | :--- | :--- |
-| **C1** | **Système temps réel (vélocité, volume)** | Broker **Apache Kafka KRaft** (3 partitions) traitant les flux continus de l'API live HuggingFace avec débit garanti et tolérance aux pannes. |
-| **C2** | **ETL/ELT entre différentes bases** | Double flux de stockage : Ingestion brute partitionnée en **Apache Parquet dans le Data Lake Bronze** (`data_lake/bronze/year=YYYY/...`) + persistance transactionnelle ACID en base SQL. |
-| **C3** | **Automatisation des flux** | Inférence automatisée via microservice **FastAPI conteneurisé (Docker / GCP Cloud Run)** + batch matinal quotidien d'audit planifié par **Apache Airflow DAG** (06h00 UTC). |
-| **C4** | **Surveillance, gouvernance & sécurité** | **Conformité stricte PCI-DSS v4.0** : troncature des cartes bancaires (6 premiers + 4 derniers chiffres : `453288******9812`) et pseudonymisation RGPD des identités. Alertes flash temps réel immédiates (< 15 ms). |
-| **C5** | **Contrôle qualité & résilience** | Data Quality Gate avec validation de schéma Pydantic, rejet des anomalies (montants négatifs, corruptions) et routage automatique vers la **Dead Letter Queue (DLQ `fraud-dlq`)**. |
+> **Enterprise Data & AI Architecture**  
+> **Auteur :** Chris GILLERON — Lead Data & AI Architect  
+> **Dépôt Officiel :** [https://github.com/Elkristobal59/CERTIFICATION_AIA](https://github.com/Elkristobal59/CERTIFICATION_AIA)  
+> **Support d'Architecture :** [`ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx`](ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx)
 
 ---
 
-## 🏗️ 2. Architecture Technique Globale de Bout en Bout
+## 🎯 1. Contexte Métier & Enjeux Opérationnels
+
+La fraude aux transactions par carte bancaire représente plus d'**un milliard d'euros de pertes annuelles** au sein de l'Union Européenne (Rapport BCE). Pour les institutions financières et plateformes de paiement, le défi consiste à intercepter les transactions frauduleuses **à la volée** avant confirmation de la transaction, sans dégrader l'expérience utilisateur des clients légitimes.
+
+Ce projet implémente une **infrastructure de données de bout en bout** combinant :
+* **Streaming Événementiel Haute Vélocité :** Transport temps réel et tolérance aux pannes via Apache Kafka.
+* **Inférence Prédictive Sub-15ms :** Microservice conteneurisé haute performance prêt pour le serverless.
+* **Sécurité & Privacy-by-Design :** Masquage strict des données bancaires (PCI-DSS) et pseudonymisation RGPD.
+* **Data Quality Gate & Résilience :** Détection automatique des anomalies de schéma et routage Dead Letter Queue (DLQ).
+* **Double Persistance Analytique & Transactionnelle :** Data Lake Bronze (Apache Parquet) et base SQL opérationnelle.
+* **Orchestration Batch Matinale :** Réconciliation quotidienne automatisée, calcul de drift et KPIs de risque.
+
+---
+
+## 🏗️ 2. Architecture Technique Globale
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                          ARCHITECTURE TECHNIQUE HYBRIDE DU PIPELINE IA                            │
 │                                                                                                   │
-│  [SOURCE API LIVE]                                                                               │
-│  API HuggingFace Stream ────────┐                                                                 │
+│  [SOURCES DE TRANSACTIONS]                                                                        │
+│  API Live Stream / POS Terminal ┐                                                                 │
 │  + Flux Replay Sécurisé         │                                                                 │
 │                                 ▼                                                                 │
 │                    ┌─────────────────────────┐                                                    │
@@ -42,127 +49,162 @@
 │                    └────────────┬────────────┘                                                    │
 │                                 │                                                                 │
 │                ┌────────────────┴────────────────┐                                                │
-│                │ (Flux valide)                   │ (Payload corrompu / anomalie)                  │
+│                │ (Payload Valide)                │ (Payload Corrompu / Anomalie)                  │
 │                ▼                                 ▼                                                │
 │   ┌─────────────────────────┐       ┌─────────────────────────┐                                   │
 │   │ CONSUMER & SCORING ML   │       │ DEAD LETTER QUEUE (DLQ) │                                   │
 │   │ • Contrôle Schéma       │       │ • Topic 'fraud-dlq'     │                                   │
-│   │ • API FastAPI Cloud Run │       │ • Table SQL DLQ         │                                   │
+│   │ • API FastAPI HTTP      │       │ • Table SQL DLQ         │                                   │
 │   └────────────┬────────────┘       └─────────────────────────┘                                   │
 │                │                                                                                  │
 │        ┌───────┴───────────────────────┐                                                          │
 │        ▼                               ▼                                                          │
 │ ┌──────────────┐             ┌─────────────────────┐                                              │
 │ │  ALERTE 🚨   │             │   DUAL PERSISTENCE  │                                              │
-│ │ Console & Log│             │ 1. Data Lake Bronze │ ➔ Parquet horodaté partitionné               │
-│ │ Immédiate    │             │ 2. BDD SQL          │ ➔ Transactions enrichies & masquées          │
+│ │ Immédiate    │             │ 1. Data Lake Bronze │ ➔ Parquet horodaté partitionné               │
+│ │ Console & Log│             │ 2. BDD SQL          │ ➔ Transactions enrichies & masquées          │
 │ └──────────────┘             └──────────┬──────────┘                                              │
 │                                         │                                                         │
 │                                         ▼                                                         │
 │                              ┌─────────────────────┐                                              │
 │                              │  DAG APACHE AIRFLOW │ (Batch Matinal Quotidien 06h00 UTC)          │
-│                              │  Rapport d'Audit    │ ➔ KPI Fraudes, Drift, Taux & Volume Sauvé    │
+│                              │  Audit & Reporting  │ ➔ Synthèse KPIs, Taux & Volume Sauvegardé    │
 │                              └─────────────────────┘                                              │
 └───────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ☁️ 3. Déploiement Serverless sur Google Cloud Run (GCP)
+## 📂 3. Organisation Modulaire du Code
 
-L'API d'inférence est conçue selon le paradigme **Serverless / Scale-to-Zero** conformément aux cours de Mehdi Semar :
-* **Zéro coût hors charge (`min-instances: 0`)** : le conteneur s'éteint complètement quand aucun trafic n'est reçu.
-* **Auto-scaling instantané** : passage à 1, 2 ou 5 instances dès qu'un pic de transactions survient.
-* **Latence d'inférence** : < 15 millisecondes par requête.
+```text
+├── .gitignore                                 # Exclusion des données brutes volumineuses et secrets
+├── README.md                                  # Documentation technique de référence
+├── ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx     # Support de présentation d'architecture
+├── sample_fraud_data.csv                      # Échantillon de données prêt pour les tests
+│
+├── 01_train/                                  # Entraînement ML & Tracking d'expérimentation
+│   ├── train_model.py                         # Algorithme HistGradientBoosting + Tracking MLflow
+│   ├── fraud_model.joblib                     # Artefact de production sérialisé
+│   └── model_metadata.json                    # Métriques de performance (Recall: 92.4%, ROC-AUC: 0.986)
+│
+├── 02_api/                                    # Microservice d'inférence temps réel (FastAPI)
+│   ├── app.py                                 # Routes /health, /predict, /predict-raw
+│   ├── Dockerfile                             # Conteneurisation multi-stage ultra-légère
+│   ├── cloudbuild.yaml                        # Configuration CI/CD Google Cloud Build
+│   ├── deploy_cloud_run.sh                    # Script de déploiement Serverless (Linux/macOS)
+│   ├── deploy_cloud_run.ps1                   # Script de déploiement Serverless (PowerShell)
+│   └── requirements.txt                       # Dépendances de production épinglées
+│
+├── 03_pipeline_streaming/                     # Tuyauterie événementielle Apache Kafka
+│   ├── producer.py                            # Ingestion continue et publication dans Kafka
+│   ├── consumer.py                            # Consommation des messages, scoring et persistence
+│   ├── alert_service.py                       # Moteur d'alerte flash et journalisation immuable
+│   └── docker-compose.kafka.yml               # Cluster Kafka KRaft + Kafka UI
+│
+├── 04_batch_airflow/                          # Batch d'audit matinal et réconciliation
+│   ├── daily_fraud_audit_dag.py               # Définition du DAG planifié à 06h00 UTC
+│   ├── run_daily_audit.py                     # Exécuteur autonome du rapport matinal
+│   └── RAPPORT_AUDIT_MATINAL_QUOTIDIEN.md     # Rapport consolidé généré pour la direction
+│
+└── 05_database/                               # Persistance relationnelle & DDL
+    ├── schema.sql                             # DDL SQL (transactions, fraud_alerts, DLQ, audit)
+    ├── db_manager.py                          # Client SQL ACID + partitionnement Parquet Data Lake
+    └── fraud_pipeline.db                      # Base opérationnelle
+```
 
-### Déploiement via le script fourni :
+---
+
+## ⚡ 4. Guide de Démarrage & Exécution
+
+### Prérequis Système :
+* **Docker & Docker Compose** installés et actifs.
+* **Python 3.10+** avec environnement virtuel recommandé.
+* Dépendances Python installées :
 ```bash
-# Avec Google Cloud SDK
+pip install -r 02_api/requirements.txt confluent-kafka pyarrow
+```
+
+---
+
+### Étape 1 : Démarrer le Cluster Kafka & l'API d'Inférence
+
+1. **Lancer le broker Kafka KRaft et son interface web :**
+```bash
+docker compose -f 03_pipeline_streaming/docker-compose.kafka.yml up -d
+```
+> 💡 *Accédez au Dashboard Kafka UI : [http://localhost:8085](http://localhost:8085)*
+
+2. **Lancer le microservice d'inférence conteneurisé :**
+```bash
+docker build -t fraud-scoring-api:latest -f 02_api/Dockerfile .
+docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest
+```
+> 💡 *Vérification du service : `curl http://localhost:8080/health`*
+
+---
+
+### Étape 2 : Lancer le Pipeline de Streaming
+
+Dans un premier terminal, démarrez le **Consommateur de streaming** :
+```bash
+python 03_pipeline_streaming/consumer.py
+```
+*Le consommateur écoute le topic `raw-transactions`, valide le schéma de chaque message, appelle l'API d'inférence, route les anomalies vers la DLQ, masque les cartes selon PCI-DSS et persiste dans le Data Lake Parquet.*
+
+Dans un second terminal, démarrez le **Producteur d'événements** :
+```bash
+python 03_pipeline_streaming/producer.py
+```
+*Le producteur interroge les flux de paiement et publie les transactions en continu dans Kafka.*
+
+---
+
+### Étape 3 : Exécuter l'Audit Matinal Quotidien
+
+Pour déclencher le calcul batch des KPIs de la veille (DAG Apache Airflow) :
+```bash
+python 04_batch_airflow/run_daily_audit.py
+```
+*Génère le rapport de synthèse exécutif dans `04_batch_airflow/RAPPORT_AUDIT_MATINAL_QUOTIDIEN.md`.*
+
+---
+
+## 🛡️ 5. Sécurité, Gouvernance & Conformité PCI-DSS
+
+### Masquage Strict des Données Bancaires (PCI-DSS v4.0) :
+Le numéro de carte bancaire (PAN) ne transite jamais et n'est **jamais stocké en clair** :
+* Application de la règle des **6 premiers (BIN) et 4 derniers chiffres** : `453288******9812`.
+* Pseudonymisation cryptographique des identités porteurs (Privacy-by-Design RGPD).
+
+### Résilience & Dead Letter Queue (DLQ) :
+Tout événement corrompu (montant négatif, schéma JSON invalide, données tronquées) est automatiquement isolé :
+* Topic Kafka dédié : `fraud-dlq`.
+* Table d'audit SQL : `dead_letter_queue`.
+* Le pipeline principal continue son exécution sans blocage ni perte de données.
+
+---
+
+## ☁️ 6. Déploiement Cloud Serverless (GCP Cloud Run)
+
+Pour basculer du runtime local au cloud managé, le service d'inférence s'intègre nativement à Google Cloud Run avec politique de **Scale-to-Zero** :
+* **Facturation à l'usage strict** : `min-instances: 0` (0 € hors requête active).
+* **Mise à l'échelle automatique** : jusqu'à 5 instances sous forte charge.
+* **Script de déploiement automatisé :**
+```bash
 bash 02_api/deploy_cloud_run.sh
 ```
-Ou avec PowerShell sur Windows :
+Ou via PowerShell :
 ```powershell
 .\02_api\deploy_cloud_run.ps1 -ProjectId "votre-projet-gcp"
 ```
 
-### Exécution locale avec Docker Desktop (Réplique exacte de Cloud Run) :
-```bash
-# 1. Build du conteneur API
-docker build -t fraud-scoring-api:latest -f 02_api/Dockerfile .
-
-# 2. Lancement sur le port 8080 (port standard Cloud Run)
-docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest
-
-# 3. Test du Healthcheck
-curl http://localhost:8080/health
-```
-
 ---
 
-## 🛡️ 4. Sécurité, PCI-DSS & Contrôle Qualité (C4 & C5)
+## 📈 7. Performances & Métriques du Modèle
 
-### Troncature & Masquage PCI-DSS v4.0 :
-Les numéros de carte de crédit ne sont **jamais stockés ni loggués en clair** :
-```python
-# db_manager.py & alert_service.py
-def mask_credit_card(cc_num):
-    # Conserve les 6 premiers (BIN) et les 4 derniers chiffres
-    return f"{s[:6]}{'*' * (len(s) - 10)}{s[-4:]}" # Ex: 453288******9812
-```
-
-### Dead Letter Queue (DLQ) & Isolation des Erreurs :
-Toute transaction malformée (ex: montant négatif, payload non JSON, attributs manquants) est interceptée par la couche de validation et redirigée vers la DLQ :
-* **Topic Kafka :** `fraud-dlq`
-* **Table SQL :** `dead_letter_queue`
-* Permet aux flux sains de continuer à circuler sans interruption de service.
-
----
-
-## 🚀 5. Guide de Lancement Pas-à-Pas pour la Démonstration & Vidéo
-
-### Prérequis :
-1. **Docker Desktop** démarré.
-2. Lancer le cluster Kafka KRaft :
-```bash
-docker compose -f 03_pipeline_streaming/docker-compose.kafka.yml up -d
-```
-> 💡 *Accédez à l'interface web de supervision des topics Kafka : [http://localhost:8085](http://localhost:8085)*
-
-3. Lancer l'API conteneurisée :
-```bash
-docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest
-```
-
-### Lancement du Pipeline de Streaming :
-
-1. **Démarrer le Consommateur de streaming Kafka (Terminal 1) :**
-```bash
-python 03_pipeline_streaming/consumer.py
-```
-*Écoute les transactions, appelle l'API d'inférence HTTP, filtre les anomalies vers la DLQ, masque les numéros de carte (PCI-DSS) et persiste dans le Data Lake Parquet et la base SQL.*
-
-2. **Démarrer le Producteur de flux en temps réel (Terminal 2) :**
-```bash
-python 03_pipeline_streaming/producer.py
-```
-*Interroge en continu l'API live HuggingFace et diffuse les événements dans le topic Kafka 'raw-transactions'.*
-
-3. **Exécuter l'Audit Matinal Quotidien (Batch DAG Apache Airflow) :**
-```bash
-python 04_batch_airflow/run_daily_audit.py
-```
-*Agrège les flux des dernières 24h et produit le rapport officiel pour les équipes Risque et Conformité.*
-
----
-
-## 🎬 6. Consignes d'Enregistrement Vidéo pour l'Évaluation Julie LMS
-
-1. **Outil d'enregistrement recommandé :** Vidyard, OBS Studio, Loom ou la barre de jeu Windows (`Win + G`).
-2. **Durée de la vidéo :** 3 à 5 minutes.
-3. **Contenu à filmer :**
-   * L'interface Docker Desktop avec les conteneurs actifs (`kafka-fraud-broker`, `kafka-fraud-ui`, `fraud-scoring-api`).
-   * L'interface web Kafka UI sur [http://localhost:8085](http://localhost:8085) montrant les topics `raw-transactions` et `fraud-dlq`.
-   * Le terminal montrant la consommation en direct et les alertes de fraude.
-   * L'ouverture du rapport d'audit matinal généré dans `04_batch_airflow/RAPPORT_AUDIT_MATINAL_QUOTIDIEN.md`.
-4. **Hébergement :** Déposer la vidéo sur Vidyard, Google Drive (lien public) ou YouTube (Non répertorié), et inscrire l'URL dans le document de soumission.
-
+* **Algorithme :** `HistGradientBoostingClassifier` avec rééquilibrage de classes.
+* **ROC-AUC :** `0.9866`
+* **Rappel Fraude (Recall) :** `92.4 %` des transactions frauduleuses interceptées.
+* **Latence moyenne d'inférence :** `< 15 ms` par requête.
+* **Traçabilité :** Paramètres, métriques et artefacts loggués dans MLflow avec enregistrement dans le Model Registry.
