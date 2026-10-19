@@ -1,0 +1,36 @@
+steps:
+  # 1. Build du conteneur Docker pour l'API de scoring
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/fraud-scoring-api:$COMMIT_SHA', '-f', '02_api/Dockerfile', '.']
+
+  # 2. Push vers Google Container Registry / Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/fraud-scoring-api:$COMMIT_SHA']
+
+  # 3. Déploiement serverless sur Google Cloud Run (Scale-to-Zero)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'fraud-scoring-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/fraud-scoring-api:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west9'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+
+images:
+  - 'gcr.io/$PROJECT_ID/fraud-scoring-api:$COMMIT_SHA'

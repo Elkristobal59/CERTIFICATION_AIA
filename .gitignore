@@ -1,0 +1,27 @@
+# Fichiers volumineux (> 100 Mo interdits par GitHub)
+fraudTest.csv
+*.mp4
+*.wav
+*.zip
+*.tar.gz
+
+# Environnements virtuels et caches Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.pytest_cache/
+
+# Données dynamiques locales et Data Lake
+data_lake/bronze/*
+!data_lake/bronze/.gitkeep
+*.db-journal
+mlruns/
+.mlflow/
+
+# Logs et runtime
+*.log
+.DS_Store
+Thumbs.db
