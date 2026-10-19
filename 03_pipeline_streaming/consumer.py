@@ -193,24 +193,25 @@ class TransactionConsumer:
                 
         return count
 
+    def start_listening(self):
+        """Démarre l'écoute continue des flux Kafka avec polling."""
+        print(f"\n🎧 Consommateur Kafka en écoute sur '{self.topic}' (DLQ: '{self.dlq_topic}')...")
+        print("   (Appuyez sur Ctrl+C pour arrêter le consommateur)\n")
+        try:
+            while True:
+                self.poll_messages(timeout=1.0, max_messages=10)
+                time.sleep(0.3)
+        except KeyboardInterrupt:
+            print("\n🛑 Arrêt du consommateur Kafka.")
+        finally:
+            self.close()
+
     def close(self):
         if self.consumer:
             self.consumer.close()
 
 
 if __name__ == "__main__":
-    consumer = TransactionConsumer()
-    print("🎧 Test de consommation unitaire...")
-    sample_tx = {
-        "trans_num": "test_txn_sample_01",
-        "amt": 980.50,
-        "merchant": "fraud_Luxury_Jewelry",
-        "category": "shopping_net",
-        "lat": 40.7128,
-        "long": -74.0060,
-        "merch_lat": 48.8566,
-        "merch_long": 2.3522,
-        "city_pop": 500000,
-        "dob": "1992-04-12"
-    }
-    consumer.process_message(sample_tx)
+    consumer = TransactionConsumer(use_api_service=True)
+    consumer.start_listening()
+

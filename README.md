@@ -133,18 +133,25 @@ docker compose -f 03_pipeline_streaming/docker-compose.kafka.yml up -d
 docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest
 ```
 
-### Lancement de la démonstration intégrale en 1 commande :
-```powershell
-python run_full_pipeline_demo.py
-```
+### Lancement du Pipeline de Streaming :
 
-Le script exécute successivement :
-1. **Connexion & Ingestion live** depuis l'API HuggingFace et les flux streaming.
-2. **Scoring en temps réel** via l'API HTTP (< 15 ms).
-3. **Alertes flash visuelles** pour les fraudes interceptées (blocage immédiat).
-4. **Injection d'un message anomalique** et preuve du routage vers la **Dead Letter Queue (DLQ)**.
-5. **Génération des fichiers Parquet** dans le Data Lake Bronze partitionné.
-6. **Exécution du Batch d'Audit Matinal Airflow** avec génération du rapport exécutif.
+1. **Démarrer le Consommateur de streaming Kafka (Terminal 1) :**
+```bash
+python 03_pipeline_streaming/consumer.py
+```
+*Écoute les transactions, appelle l'API d'inférence HTTP, filtre les anomalies vers la DLQ, masque les numéros de carte (PCI-DSS) et persiste dans le Data Lake Parquet et la base SQL.*
+
+2. **Démarrer le Producteur de flux en temps réel (Terminal 2) :**
+```bash
+python 03_pipeline_streaming/producer.py
+```
+*Interroge en continu l'API live HuggingFace et diffuse les événements dans le topic Kafka 'raw-transactions'.*
+
+3. **Exécuter l'Audit Matinal Quotidien (Batch DAG Apache Airflow) :**
+```bash
+python 04_batch_airflow/run_daily_audit.py
+```
+*Agrège les flux des dernières 24h et produit le rapport officiel pour les équipes Risque et Conformité.*
 
 ---
 
@@ -153,8 +160,9 @@ Le script exécute successivement :
 1. **Outil d'enregistrement recommandé :** Vidyard, OBS Studio, Loom ou la barre de jeu Windows (`Win + G`).
 2. **Durée de la vidéo :** 3 à 5 minutes.
 3. **Contenu à filmer :**
-   * L'interface Docker Desktop avec les 3 conteneurs actifs (`kafka-fraud-broker`, `kafka-fraud-ui`, `fraud-scoring-api`).
+   * L'interface Docker Desktop avec les conteneurs actifs (`kafka-fraud-broker`, `kafka-fraud-ui`, `fraud-scoring-api`).
    * L'interface web Kafka UI sur [http://localhost:8085](http://localhost:8085) montrant les topics `raw-transactions` et `fraud-dlq`.
-   * Le terminal exécutant `python run_full_pipeline_demo.py`.
+   * Le terminal montrant la consommation en direct et les alertes de fraude.
    * L'ouverture du rapport d'audit matinal généré dans `04_batch_airflow/RAPPORT_AUDIT_MATINAL_QUOTIDIEN.md`.
 4. **Hébergement :** Déposer la vidéo sur Vidyard, Google Drive (lien public) ou YouTube (Non répertorié), et inscrire l'URL dans le document de soumission.
+

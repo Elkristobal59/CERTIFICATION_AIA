@@ -1,9 +1,22 @@
-# Fichiers volumineux (> 100 Mo interdits par GitHub)
+# Fichiers volumineux (> 100 Mo interdits par GitHub) & Audios
 fraudTest.csv
 *.mp4
 *.wav
+*.mp3
 *.zip
 *.tar.gz
+
+# Fichiers de travail internes & Préparation soutenance
+Bloc 3 - Coaching.png
+schemas_coaching/
+*transcript*
+coaching_segments.json
+DEMO_VIDEO_GUIDE_PAS_A_PAS.md
+GUIDE_COMPLET_BLOC_3_FRAUD_PIPELINE.md
+PITCH_ORAL_CERTIFICATION_BLOC3_5MIN.md
+generate_bloc3_presentation.py
+run_full_pipeline_demo.py
+synthesize_pitch_bloc3.py
 
 # Environnements virtuels et caches Python
 __pycache__/
@@ -20,6 +33,12 @@ data_lake/bronze/*
 *.db-journal
 mlruns/
 .mlflow/
+
+# Sécurité & Variables d'environnement
+.env
+.env.*
+*.key
+*.pem
 
 # Logs et runtime
 *.log

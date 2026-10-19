@@ -4,7 +4,7 @@ import time
 import json
 import urllib.request
 import pandas as pd
-from typing import Dict, Any, Generator
+from typing import Dict, Any, Generator, Optional
 
 # Forcer l'encodage console UTF-8
 if hasattr(sys.stdout, "reconfigure"):
@@ -13,6 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(BASE_DIR, "fraudTest.csv")
+SAMPLE_CSV_PATH = os.path.join(BASE_DIR, "sample_fraud_data.csv")
 HF_URL = "https://sdacelo-real-time-fraud-detection.hf.space/current-transactions"
 
 # Support de Confluent Kafka ou kafka-python si disponible
@@ -63,7 +64,7 @@ class TransactionProducer:
     def fetch_hf_transaction(self) -> Dict[str, Any]:
         """Récupère la transaction temps réel publiée par le Space HuggingFace."""
         req = urllib.request.Request(HF_URL, headers={'User-Agent': 'Mozilla/5.0 (Pipeline-Ingestion-AIA)'})
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             raw = response.read().decode('utf-8')
             inner_json = json.loads(raw)
             from io import StringIO
@@ -71,15 +72,15 @@ class TransactionProducer:
             return df.iloc[0].to_dict()
 
     def fallback_generator(self) -> Generator[Dict[str, Any], None, None]:
-        """Générateur de secours à partir de fraudTest.csv avec injection de cas de fraudes réelles."""
-        df_sample = pd.read_csv(CSV_PATH, nrows=2000)
-        # Mélange fraudes et transactions régulières
+        """Générateur à partir du dataset échantillon ou historique avec cas de fraudes réelles."""
+        source = CSV_PATH if os.path.exists(CSV_PATH) else SAMPLE_CSV_PATH
+        df_sample = pd.read_csv(source, nrows=2000)
         frauds = df_sample[df_sample['is_fraud'] == 1]
         normals = df_sample[df_sample['is_fraud'] == 0]
         
         idx = 0
         while True:
-            # 1 transaction sur 4 est une fraude pour dynamiser la démo
+            # 1 transaction sur 4 est une fraude pour valider la détection
             if idx % 4 == 0 and len(frauds) > 0:
                 row = frauds.iloc[(idx // 4) % len(frauds)].to_dict()
             else:
@@ -90,7 +91,6 @@ class TransactionProducer:
 
     def send(self, transaction: Dict[str, Any]):
         """Publie une transaction vers Kafka ou l'Event Stream."""
-        # Nettoyage des valeurs non-sérialisables (Timestamp, NaN)
         cleaned = {}
         for k, v in transaction.items():
             if pd.isna(v):
@@ -109,17 +109,33 @@ class TransactionProducer:
                 self.producer.flush()
         return cleaned
 
+    def start_streaming(self, max_count: Optional[int] = None, interval_sec: float = 1.0):
+        """Lance la production continue de flux vers Kafka."""
+        print(f"\n📡 Démarrage du Producteur de Streaming vers Kafka (Topic: '{self.topic}')...")
+        print("   (Appuyez sur Ctrl+C pour arrêter le flux)\n")
+        fallback_gen = self.fallback_generator()
+        count = 0
+        try:
+            while max_count is None or count < max_count:
+                count += 1
+                source_label = "API Live HF"
+                try:
+                    tx = self.fetch_hf_transaction()
+                except Exception:
+                    tx = next(fallback_gen)
+                    source_label = "Replay Stream"
+                
+                cleaned = self.send(tx)
+                merchant = str(cleaned.get("merchant", "Inconnu"))[:25]
+                amt = float(cleaned.get("amt", 0.0))
+                print(f"[{count:03d}] 📤 Publié sur Kafka | {source_label:<13} | {merchant:<25} | {amt:>8.2f} €", flush=True)
+                time.sleep(interval_sec)
+        except KeyboardInterrupt:
+            print("\n🛑 Arrêt du producteur de flux.")
+        finally:
+            if self.producer and hasattr(self.producer, 'flush'):
+                self.producer.flush()
+
 if __name__ == "__main__":
     producer = TransactionProducer()
-    print("📡 Test d'ingestion depuis l'API HuggingFace...")
-    try:
-        tx = producer.fetch_hf_transaction()
-        print(f"📥 Transaction récupérée avec succès : {tx.get('merchant')} | {tx.get('amt')} €")
-        res = producer.send(tx)
-        print("🚀 Transaction publiée avec succès dans le pipeline !")
-    except Exception as e:
-        print(f"⚠️ Échec appel API HF ({e}), test avec générateur de secours...")
-        gen = producer.fallback_generator()
-        tx = next(gen)
-        producer.send(tx)
-        print(f"📥 Transaction générée : {tx.get('merchant')} | {tx.get('amt')} €")
+    producer.start_streaming(interval_sec=1.5)
