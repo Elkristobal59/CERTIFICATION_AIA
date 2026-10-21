@@ -7,8 +7,6 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![PCI-DSS](https://img.shields.io/badge/Compliance-PCI--DSS_v4.0-success)](#-sécurité-gouvernance--conformité-pci-dss)
 
-> **Enterprise Data & AI Architecture**  
-> **Auteur :** Chris GILLERON — Lead Data & AI Architect  
 > **Dépôt Officiel :** [https://github.com/Elkristobal59/CERTIFICATION_AIA](https://github.com/Elkristobal59/CERTIFICATION_AIA)  
 > **Support d'Architecture :** [`ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx`](ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx)
 
