@@ -2,10 +2,6 @@
 
 Dépôt officiel des livrables et projets techniques présentés dans le cadre de la certification professionnelle d'Architecte en Intelligence Artificielle (Jedha Bootcamp / France Compétences).
 
-* **Candidat :** Christopher Gilleron
-* **Titre visé :** Architecte en Intelligence Artificielle (Code RNCP : 41993, Niveau 7 / Bac+5)
-* **Organisme certificateur :** Jedha Bootcamp
-
 ---
 
 ## Vue d'ensemble des 4 Blocs de Compétences
@@ -102,11 +98,3 @@ CERTIFICATION_AIA/
 ```
 
 ---
-
-## Modalités d'Évaluation (RNCP 41993)
-
-L'examen final se déroule sous la forme d'une soutenance orale séquentielle continue de 1h25 (85 minutes) devant un jury de professionnels :
-* **Bloc 1 (Gouvernance) :** 15 min de présentation + 15 min de questions/réponses (30 min)
-* **Bloc 2 (Architecture) :** 5 min de présentation + 15 min de questions/réponses (20 min)
-* **Bloc 3 (Pipelines) :** 5 min de présentation + 15 min de questions/réponses (20 min)
-* **Bloc 4 (MLOps) :** 5 min de présentation + 10 min de questions/réponses (15 min)

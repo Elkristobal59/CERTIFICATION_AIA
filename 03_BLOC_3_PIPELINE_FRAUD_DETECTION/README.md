@@ -1,9 +1,6 @@
-# Bloc 3 — Pipeline de Streaming & Détection de Fraude en Temps Réel
+# Pipeline de Streaming & Détection de Fraude en Temps Réel — Kafka
 
-> **Cas d'étude :** Détection de Fraude Bancaire en Temps Réel (Apache Kafka & Scikit-Learn)  
-> **Certification :** Architecte en Intelligence Artificielle (RNCP 41993)  
-> **Candidat :** Christopher Gilleron  
-> **Format d'évaluation :** Soutenance orale de 20 minutes (5 min pitch + 15 min Q&A avec démonstration)
+Chaîne complète de streaming événementiel (Apache Kafka KRaft), inférence prédictive sub-15ms (FastAPI), Dead Letter Queue et audit matinal (Apache Airflow).  
 
 ---
 

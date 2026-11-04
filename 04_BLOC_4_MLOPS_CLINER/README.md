@@ -1,9 +1,6 @@
 # Bloc 4 — Industrialisation, Déploiement & MLOps
 
 > **Projet :** CliNER-MLOps (Clinical Named Entity Recognition & Continuous Training)  
-> **Certification :** Architecte en Intelligence Artificielle (RNCP 41993)  
-> **Candidat :** Christopher Gilleron  
-> **Format d'évaluation :** Soutenance orale de 15 minutes (5 min pitch + 10 min Q&A)  
 > **Dépôt GitHub de l'Application & CI/CD :** 👉 [https://github.com/Elkristobal59/cliner-mlops](https://github.com/Elkristobal59/cliner-mlops)
 
 ---

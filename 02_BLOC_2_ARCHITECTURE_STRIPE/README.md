@@ -1,9 +1,6 @@
-# Bloc 2 — Architecture Data & Calcul pour l'IA
+# Architecture Data & Cloud Souveraine — Stripe
 
-> **Cas d'étude :** Conception d'une Architecture Cloud Souveraine pour Stripe Europe  
-> **Certification :** Architecte en Intelligence Artificielle (RNCP 41993)  
-> **Candidat :** Christopher Gilleron  
-> **Format d'évaluation :** Soutenance orale de 20 minutes (5 min pitch + 15 min Q&A)
+Conception d'une infrastructure cloud souveraine (AWS Paris eu-west-3) pour le traitement des paiements et l'évaluation du risque de fraude en temps réel (< 100 ms).  
 
 ---
 

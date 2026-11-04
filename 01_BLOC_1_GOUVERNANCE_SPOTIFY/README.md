@@ -1,9 +1,6 @@
-# Bloc 1 — Gouvernance des Données & des Systèmes d'IA
+# Gouvernance des Données & des Systèmes d'IA — Spotify
 
-> **Cas d'étude :** Stratégie de Gouvernance et Conformité Réglementaire pour Spotify Europe  
-> **Certification :** Architecte en Intelligence Artificielle (RNCP 41993)  
-> **Candidat :** Christopher Gilleron  
-> **Format d'évaluation :** Soutenance orale de 30 minutes (15 min pitch + 15 min Q&A)
+Stratégie de gouvernance globale des données, organisation en CoE Hybride (Hub & Spoke), matrice RACI opérationnelle et conformité réglementaire (RGPD).  
 
 ---
 
