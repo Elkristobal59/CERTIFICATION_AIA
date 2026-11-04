@@ -88,7 +88,7 @@ CERTIFICATION_AIA/
 │   ├── LIVRABLES/         # 9 rapports techniques PDF, présentation PPTX, modèles DBML/PNG
 │   └── README.md          # Synthèse d'architecture cloud et SLA de latence
 ├── 03_BLOC_3_PIPELINE_FRAUD_DETECTION/
-│   ├── LIVRABLES/         # Rapport d'architecture PDF, support PPTX, fiche démo
+│   ├── LIVRABLES/         # Rapport d'architecture PDF, support PPTX, fiche lien démo vidéo
 │   ├── 01_train/          # Scripts et modèle de scoring entraîné
 │   ├── 02_api/            # Microservice FastAPI Dockerisé
 │   ├── 03_pipeline_streaming/ # Broker Kafka, Consumer, Alerting, DLQ
