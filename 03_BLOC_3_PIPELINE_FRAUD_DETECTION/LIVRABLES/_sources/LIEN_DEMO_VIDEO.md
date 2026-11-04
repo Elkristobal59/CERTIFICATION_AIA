@@ -38,3 +38,4 @@ docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest
 # 3. Lancer le flux streaming de démonstration
 python run_full_pipeline_demo.py
 ```
+
