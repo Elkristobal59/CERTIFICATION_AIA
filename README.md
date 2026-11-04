@@ -8,12 +8,12 @@ Dépôt officiel des livrables et projets techniques présentés dans le cadre d
 
 Ce dépôt centralise les travaux d'ingénierie, architectures, codes sources et livrables officiels répartis selon les 4 blocs du référentiel RNCP 41993 :
 
-| Bloc | Intitulé officiel | Cas d'étude / Projet | Nature de l'épreuve | Statut | Emplacement / Dépôt |
-| :---: | :--- | :--- | :--- | :---: | :--- |
-| **Bloc 1** | Concevoir et piloter la gouvernance des données et des systèmes d'IA | **Spotify** (Gouvernance & RGPD) | Dossier écrit & Soutenance (15 min pitch + 15 min Q&A) | Prêt | [`01_BLOC_1_GOUVERNANCE_SPOTIFY/`](./01_BLOC_1_GOUVERNANCE_SPOTIFY/) |
-| **Bloc 2** | Concevoir et déployer l'infrastructure de données et de calcul pour l'IA | **Stripe** (Architecture Cloud Souveraine) | Dossier de conception (5 min pitch + 15 min Q&A) | Prêt | [`02_BLOC_2_ARCHITECTURE_STRIPE/`](./02_BLOC_2_ARCHITECTURE_STRIPE/) |
-| **Bloc 3** | Concevoir et mettre en œuvre des pipelines de données pour l'IA | **Fraud Detection** (Streaming Kafka & Batch) | Infrastructure déployée & Démo (5 min pitch + 15 min Q&A) | Prêt | [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/) |
-| **Bloc 4** | Concevoir et piloter l'industrialisation et le déploiement de solutions d'IA | **CliNER-MLOps** (LLM LoRA & Drift) | Application en production & MLOps (5 min pitch + 10 min Q&A) | Prêt | [Dépôt dédié `cliner-mlops`](https://github.com/Elkristobal59/cliner-mlops) |
+| Bloc | Intitulé officiel | Cas d'étude / Projet | Emplacement / Dépôt |
+| :---: | :--- | :--- | :--- |
+| **Bloc 1** | Concevoir et piloter la gouvernance des données et des systèmes d'IA | **Spotify** (Gouvernance & RGPD) | [`01_BLOC_1_GOUVERNANCE_SPOTIFY/`](./01_BLOC_1_GOUVERNANCE_SPOTIFY/) |
+| **Bloc 2** | Concevoir et déployer l'infrastructure de données et de calcul pour l'IA | **Stripe** (Architecture Cloud Souveraine) | [`02_BLOC_2_ARCHITECTURE_STRIPE/`](./02_BLOC_2_ARCHITECTURE_STRIPE/) |
+| **Bloc 3** | Concevoir et mettre en œuvre des pipelines de données pour l'IA | **Fraud Detection** (Streaming Kafka & Batch) | [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/) |
+| **Bloc 4** | Concevoir et piloter l'industrialisation et le déploiement de solutions d'IA | **CliNER-MLOps** (LLM LoRA & Drift) | [Dépôt dédié `cliner-mlops`](https://github.com/Elkristobal59/cliner-mlops) |
 
 ---
 
