@@ -1,0 +1,135 @@
+////////////////////////////////////////////////////////////////////////////////
+// STRIPE AI INFRASTRUCTURE - OLTP & OLAP DATA MODEL (DBML)
+// Certification AIL - Bloc 2 (RNCP 41993)
+// Auteur: Lead AI Architect Stripe
+// Importable directement sur https://dbdiagram.io/home
+////////////////////////////////////////////////////////////////////////////////
+
+// ============================================================================
+// 1. SECTION OLTP : SYSTÈME TRANSACTIONNEL HAUTE DISPONIBILITÉ (3NF - ACID)
+// Moteur cible : Amazon Aurora PostgreSQL Multi-AZ
+// ============================================================================
+
+Table Merchant {
+  merchant_id varchar(32) [pk, note: 'Identifiant unique Stripe du marchand (ex: acct_1H2X...)']
+  business_name varchar(150) [not null]
+  legal_entity_type varchar(50) [note: 'corporation, individual, non_profit']
+  mcc_code varchar(4) [not null, note: 'Merchant Category Code (ex: 5732 electronics, 5812 restaurants)']
+  country varchar(2) [not null, note: 'Code pays ISO-2 (résidence fiscale et conformité)']
+  settlement_currency varchar(3) [not null, note: 'Devise de règlement par défaut (EUR, USD, GBP...)']
+  payout_schedule varchar(20) [default: 'daily', note: 'daily, weekly, monthly']
+  risk_level varchar(20) [default: 'standard', note: 'low, standard, elevated, restricted']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  is_active boolean [default: true]
+
+  Note: 'Entité marchande opérant sur Stripe Connect ou Checkout'
+}
+
+Table Customer {
+  customer_id varchar(32) [pk, note: 'Identifiant unique client final (ex: cus_9s8f...)']
+  merchant_id varchar(32) [ref: > Merchant.merchant_id, note: 'Marchand propriétaire du client']
+  email_hash varchar(64) [not null, note: 'SHA-256 de l email pour pseudonymisation RGPD']
+  country varchar(2) [note: 'Pays de facturation principal']
+  risk_score float [default: 0.0, note: 'Score de réputation client agrégé [0.0 - 1.0]']
+  is_verified boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  last_active_at timestamp
+
+  Note: 'Client final (acheteur). Conforme RGPD : données PII pseudonymisées'
+}
+
+Table PaymentMethod {
+  payment_method_id varchar(32) [pk, note: 'ID du moyen de paiement tokenisé (ex: pm_1J8x...)']
+  customer_id varchar(32) [ref: > Customer.customer_id]
+  type varchar(30) [not null, note: 'card, sepa_debit, ideal, apple_pay, google_pay']
+  fingerprint varchar(64) [not null, note: 'Empreinte cryptographique de la carte pour détection de vélocité']
+  card_brand varchar(20) [note: 'visa, mastercard, amex, cb']
+  card_last4 varchar(4) [note: '4 derniers chiffres (seul élément de carte stocké hors Tokenization Vault)']
+  card_exp_month int [note: 'Mois expiration (1-12)']
+  card_exp_year int [note: 'Année expiration']
+  card_country varchar(2) [note: 'Pays émetteur de la carte']
+  card_funding varchar(20) [note: 'credit, debit, prepaid']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Token de paiement sécurisé. Strictement conforme PCI-DSS Level 1 (zéro PAN stocké)'
+}
+
+Table Transaction {
+  transaction_id varchar(32) [pk, note: 'ID unique de la transaction (ex: txn_3M7q...)']
+  merchant_id varchar(32) [ref: > Merchant.merchant_id, not null]
+  customer_id varchar(32) [ref: > Customer.customer_id]
+  payment_method_id varchar(32) [ref: > PaymentMethod.payment_method_id, not null]
+  amount bigint [not null, note: 'Montant en centimes (évite erreurs d arrondis en virgule flottante)']
+  currency varchar(3) [not null, note: 'Code devise ISO-4217 (EUR, USD, etc.)']
+  stripe_fee bigint [not null, note: 'Commission Stripe perçue en centimes']
+  net_amount bigint [not null, note: 'Montant net versé au marchand (amount - stripe_fee)']
+  status varchar(25) [not null, note: 'requires_action, authorized, captured, succeeded, failed, refunded, disputed']
+  failure_code varchar(50) [note: 'insufficient_funds, card_declined, expired_card, fraud_blocked']
+  client_ip varchar(45) [note: 'Adresse IP du payeur (IPv4/IPv6) pour contrôle de géolocalisation']
+  ip_country varchar(2) [note: 'Pays géolocalisé via IP (MaxMind)']
+  device_type varchar(20) [note: 'mobile_ios, mobile_android, desktop_web, api_pos']
+  fraud_score float [note: 'Score de fraude calculé en temps réel par Radar (< 100 ms) [0-100]']
+  fraud_action varchar(20) [note: 'allow, review, block, challenge_3ds']
+  idempotency_key varchar(64) [unique, note: 'Garantit l idempotence des requêtes API et prévient les doubles débits']
+  created_at timestamp [not null, default: `now()`]
+  captured_at timestamp
+
+  Note: 'Table maîtresse OLTP. Clé de voûte de l encaissement temps réel. Propriétés ACID garanties.'
+}
+
+Table FraudEvaluation {
+  evaluation_id varchar(32) [pk, note: 'ID de l audit d inférence de fraude (ex: fe_8k2...)']
+  transaction_id varchar(32) [ref: > Transaction.transaction_id, not null]
+  model_version varchar(50) [not null, note: 'Version du modèle en production (ex: radar_xgb_v2.4.1)']
+  inference_latency_ms float [not null, note: 'Temps d inférence mesuré en millisecondes (< 100 ms)']
+  risk_score float [not null, note: 'Probabilité brute de fraude émise par le modèle [0.0 - 1.0]']
+  rule_triggers varchar(255) [note: 'Règles heuristiques déclenchées (ex: VELOCITY_CARD_1H, IP_MISMATCH)']
+  vector_distance float [note: 'Distance cosinus par rapport aux patterns de fraude connus (Vector DB)']
+  feature_vector_id varchar(64) [note: 'Hash du vecteur de features injecté depuis Feast/Redis']
+  final_decision varchar(20) [not null, note: 'allow, block, manual_review, 3ds_challenge']
+  evaluated_at timestamp [not null, default: `now()`]
+
+  Note: 'Enregistrement d inférence temps réel pour traçabilité MLOps et réentraînement'
+}
+
+Table Refund {
+  refund_id varchar(32) [pk, note: 'ID du remboursement (ex: re_1H9x...)']
+  transaction_id varchar(32) [ref: > Transaction.transaction_id, not null]
+  amount bigint [not null, note: 'Montant remboursé en centimes']
+  currency varchar(3) [not null]
+  reason varchar(50) [note: 'duplicate, fraudulent, requested_by_customer']
+  status varchar(20) [not null, note: 'pending, succeeded, failed']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Remboursements partiels ou totaux'
+}
+
+Table Dispute {
+  dispute_id varchar(32) [pk, note: 'ID du litige bancaire / chargeback (ex: dp_7N3v...)']
+  transaction_id varchar(32) [ref: > Transaction.transaction_id, not null]
+  amount bigint [not null, note: 'Montant contesté par la banque émettrice']
+  currency varchar(3) [not null]
+  reason varchar(50) [not null, note: 'fraudulent, unrecognized, subscription_canceled, product_not_received']
+  status varchar(30) [not null, note: 'warning_needs_response, needs_response, under_review, won, lost']
+  evidence_due_by timestamp
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Chargebacks et contestations de paiements'
+}
+
+Table MerchantPayout {
+  payout_id varchar(32) [pk, note: 'ID du virement bancaire marchand (ex: po_4L9m...)']
+  merchant_id varchar(32) [ref: > Merchant.merchant_id, not null]
+  amount bigint [not null, note: 'Montant total viré en centimes']
+  currency varchar(3) [not null]
+  destination_bank_account_last4 varchar(4)
+  status varchar(20) [not null, note: 'pending, in_transit, paid, failed, canceled']
+  arrival_date date [not null]
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Virements bancaires automatiques vers les comptes des marchands'
+}
+
+
+// ============================================================================

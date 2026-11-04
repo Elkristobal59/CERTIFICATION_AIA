@@ -1,0 +1,26 @@
+{
+  "model_type": "HistGradientBoostingClassifier",
+  "features": [
+    "amt",
+    "distance_km",
+    "city_pop",
+    "hour",
+    "age"
+  ],
+  "parameters": {
+    "class_weight": "balanced",
+    "max_iter": 120,
+    "learning_rate": 0.08,
+    "max_depth": 6,
+    "random_state": 42
+  },
+  "sample_size": 200000,
+  "metrics": {
+    "roc_auc": 0.9866,
+    "recall": 0.9244,
+    "precision": 0.1011,
+    "f1": 0.1823
+  },
+  "trained_at": "2026-10-28 23:11:06",
+  "training_duration_sec": 6.86
+}

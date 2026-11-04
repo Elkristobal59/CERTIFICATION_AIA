@@ -154,12 +154,8 @@ def train():
                     "f1": float(f1),
                     "duration_seconds": float(time.time() - t0)
                 })
-                mlflow.sklearn.log_model(
-                    sk_model=model,
-                    artifact_path="fraud_model",
-                    registered_model_name="FraudDetectionModel"
-                )
-                mlflow.log_artifact(META_PATH)
+                mlflow.log_artifact(MODEL_PATH, artifact_path="model")
+                mlflow.log_artifact(META_PATH, artifact_path="metadata")
             print(f"🌟 MLflow Run consigné avec succès (Tracking: {tracking_uri})")
         except Exception as e:
             print(f"⚠️ MLflow logging ignoré ({e})")

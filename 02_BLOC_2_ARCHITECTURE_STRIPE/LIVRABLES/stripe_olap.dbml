@@ -1,0 +1,145 @@
+////////////////////////////////////////////////////////////////////////////////
+// STRIPE AI INFRASTRUCTURE - OLAP STAR SCHEMA DATA MODEL (DBML)
+// Certification AIL - Bloc 2 (RNCP 41993)
+// Importable directement sur https://dbdiagram.io/home
+////////////////////////////////////////////////////////////////////////////////
+
+// 2. SECTION OLAP : DATA WAREHOUSE & ANALYTIQUE EN ÉTOILE (STAR SCHEMA)
+// Moteur cible : Amazon Redshift Serverless / Snowflake
+// ============================================================================
+
+Table DimMerchant {
+  merchant_key int [pk, increment, note: 'Clé de substitution technique (surrogate key)']
+  merchant_id varchar(32) [not null, note: 'Clé naturelle opérationnelle']
+  business_name varchar(150)
+  mcc_code varchar(4)
+  mcc_category_name varchar(50) [note: 'Retail, SaaS, Travel, Gaming, Food']
+  country varchar(2)
+  risk_level varchar(20)
+  created_year int
+  created_month int
+  is_active boolean
+
+  Note: 'Dimension Marchand (analyse sectorielle, maturité et profil de risque)'
+}
+
+Table DimCustomer {
+  customer_key int [pk, increment]
+  customer_id varchar(32) [not null]
+  merchant_id varchar(32) [not null]
+  country varchar(2)
+  risk_segment varchar(20) [note: 'VIP, Standard, HighRisk, Dormant']
+  account_age_days int
+  created_year int
+
+  Note: 'Dimension Client (analyse de cohorte et segmentation comportementale)'
+}
+
+Table DimDate {
+  date_key int [pk, note: 'Clé entière AAAAMMJJ (ex: 20260906)']
+  full_date date [not null]
+  year int [not null]
+  quarter int [not null]
+  month int [not null]
+  month_name varchar(20) [not null]
+  week_of_year int [not null]
+  day_of_month int [not null]
+  day_of_week int [not null]
+  day_name varchar(20) [not null]
+  is_weekend boolean [not null]
+  is_holiday boolean [default: false]
+
+  Note: 'Dimension Temps standard pour agrégations chronologiques rapides'
+}
+
+Table DimPaymentMethod {
+  payment_method_key int [pk, increment]
+  type varchar(30) [not null]
+  card_brand varchar(20)
+  card_country varchar(2)
+  card_funding varchar(20)
+  is_cross_border boolean [note: 'Vrai si pays carte != pays marchand']
+
+  Note: 'Dimension Moyen de paiement pour audit des coûts d interchange et risques'
+}
+
+Table DimGeoLocation {
+  geo_key int [pk, increment]
+  country_code varchar(2) [not null]
+  region varchar(100)
+  city varchar(100)
+  is_high_risk_country boolean [default: false]
+  is_datacenter_or_vpn boolean [default: false]
+
+  Note: 'Dimension Géographie pour détection de clusters de cybercriminalité'
+}
+
+Table DimStatus {
+  status_key int [pk, increment]
+  payment_status varchar(25) [not null]
+  failure_code varchar(50)
+  dispute_reason varchar(50)
+  fraud_action varchar(20)
+
+  Note: 'Dimension État et motifs de rejet'
+}
+
+// ----------------------------------------------------------------------------
+// TABLES DE FAITS
+// ----------------------------------------------------------------------------
+
+Table FactTransactions {
+  fact_txn_key bigint [pk, increment]
+  date_key int [ref: > DimDate.date_key, not null]
+  merchant_key int [ref: > DimMerchant.merchant_key, not null]
+  customer_key int [ref: > DimCustomer.customer_key]
+  payment_method_key int [ref: > DimPaymentMethod.payment_method_key, not null]
+  geo_key int [ref: > DimGeoLocation.geo_key, not null]
+  status_key int [ref: > DimStatus.status_key, not null]
+  
+  // Mesures quantitatives additives & semi-additives
+  gross_amount_cents bigint [not null, note: 'Montant brut en centimes']
+  stripe_fee_cents bigint [not null, note: 'Marge brute Stripe']
+  interchange_fee_cents bigint [note: 'Frais de réseau Visa/Mastercard']
+  net_merchant_amount_cents bigint [not null]
+  refunded_amount_cents bigint [default: 0]
+  is_disputed int [default: 0, note: '1 si litige ultérieur, 0 sinon']
+  fraud_score float [note: 'Score de fraude Radar calculé [0-100]']
+  inference_latency_ms float [note: 'Temps de réponse du microservice d inférence']
+  transaction_count int [default: 1, note: 'Facilite les COUNT() additifs']
+
+  Note: 'Table de faits principale. Grain : 1 ligne = 1 transaction unitaire'
+}
+
+Table FactDailyMerchantRevenue {
+  fact_daily_key bigint [pk, increment]
+  date_key int [ref: > DimDate.date_key, not null]
+  merchant_key int [ref: > DimMerchant.merchant_key, not null]
+  
+  total_volume_cents bigint [not null]
+  successful_txns_count int [not null]
+  failed_txns_count int [not null]
+  refunded_txns_count int [not null]
+  total_fees_collected_cents bigint [not null]
+  total_payout_cents bigint [not null]
+  chargeback_count int [not null, default: 0]
+  fraud_blocked_count int [not null, default: 0]
+
+  Note: 'Table de faits agrégée quotidienne. Grain : 1 ligne = 1 marchand par jour'
+}
+
+Table FactFraudAlerts {
+  fact_alert_key bigint [pk, increment]
+  date_key int [ref: > DimDate.date_key, not null]
+  merchant_key int [ref: > DimMerchant.merchant_key, not null]
+  payment_method_key int [ref: > DimPaymentMethod.payment_method_key, not null]
+  geo_key int [ref: > DimGeoLocation.geo_key, not null]
+  
+  risk_score float [not null]
+  vector_distance float
+  prevented_loss_cents bigint [not null, note: 'Montant de fraude préservé grâce au blocage']
+  action_taken varchar(20) [not null]
+  is_false_positive int [default: 0, note: '1 si débloqué par le marchand après réclamation']
+
+  Note: 'Table de faits d audit de sécurité et de performance de l IA Radar'
+}

@@ -1,208 +1,113 @@
-# 💳 Real-Time Fraud Detection & Streaming Analytics Pipeline
+# Certification Architecte en Intelligence Artificielle (RNCP 41993 - Niveau 7)
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Kafka](https://img.shields.io/badge/Apache_Kafka-KRaft_7.5-231F20?logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Airflow](https://img.shields.io/badge/Apache_Airflow-2.8+-017CEE?logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![PCI-DSS](https://img.shields.io/badge/Compliance-PCI--DSS_v4.0-success)](#-sécurité-gouvernance--conformité-pci-dss)
+Dépôt officiel des livrables et projets techniques présentés dans le cadre de la certification professionnelle d'Architecte en Intelligence Artificielle (Jedha Bootcamp / France Compétences).
 
-> **Dépôt Officiel :** [https://github.com/Elkristobal59/CERTIFICATION_AIA](https://github.com/Elkristobal59/CERTIFICATION_AIA)  
-> **Support d'Architecture :** [`ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx`](ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx)
+* **Candidat :** Christopher Gilleron
+* **Titre visé :** Architecte en Intelligence Artificielle (Code RNCP : 41993, Niveau 7 / Bac+5)
+* **Organisme certificateur :** Jedha Bootcamp
 
 ---
 
-## 🎯 1. Contexte Métier & Enjeux Opérationnels
+## Vue d'ensemble des 4 Blocs de Compétences
 
-La fraude aux transactions par carte bancaire représente plus d'**un milliard d'euros de pertes annuelles** au sein de l'Union Européenne (Rapport BCE). Pour les institutions financières et plateformes de paiement, le défi consiste à intercepter les transactions frauduleuses **à la volée** avant confirmation de la transaction, sans dégrader l'expérience utilisateur des clients légitimes.
+Ce dépôt centralise les travaux, codes sources et livrables d'évaluation répartis selon les 4 blocs du référentiel officiel :
 
-Ce projet implémente une **infrastructure de données de bout en bout** combinant :
-* **Streaming Événementiel Haute Vélocité :** Transport temps réel et tolérance aux pannes via Apache Kafka.
-* **Inférence Prédictive Sub-15ms :** Microservice conteneurisé haute performance prêt pour le serverless.
-* **Sécurité & Privacy-by-Design :** Masquage strict des données bancaires (PCI-DSS) et pseudonymisation RGPD.
-* **Data Quality Gate & Résilience :** Détection automatique des anomalies de schéma et routage Dead Letter Queue (DLQ).
-* **Double Persistance Analytique & Transactionnelle :** Data Lake Bronze (Apache Parquet) et base SQL opérationnelle.
-* **Orchestration Batch Matinale :** Réconciliation quotidienne automatisée, calcul de drift et KPIs de risque.
+| Bloc | Intitulé officiel | Cas d'étude / Projet | Nature de l'épreuve | Statut | Dossier local |
+| :---: | :--- | :--- | :--- | :---: | :--- |
+| **Bloc 1** | Concevoir et piloter la gouvernance des données et des systèmes d'IA | **Spotify** (Gouvernance & RGPD) | Dossier écrit & Soutenance (15 min pitch + 15 min Q&A) | Prêt | [`01_BLOC_1_GOUVERNANCE_SPOTIFY/`](./01_BLOC_1_GOUVERNANCE_SPOTIFY/) |
+| **Bloc 2** | Concevoir et déployer l'infrastructure de données et de calcul pour l'IA | **Stripe** (Architecture Cloud Souveraine) | Dossier de conception (5 min pitch + 15 min Q&A) | Prêt | [`02_BLOC_2_ARCHITECTURE_STRIPE/`](./02_BLOC_2_ARCHITECTURE_STRIPE/) |
+| **Bloc 3** | Concevoir et mettre en œuvre des pipelines de données pour l'IA | **Fraud Detection** (Streaming Kafka & Batch) | Infrastructure déployée & Démo (5 min pitch + 15 min Q&A) | Prêt | [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/) |
+| **Bloc 4** | Concevoir et piloter l'industrialisation et le déploiement de solutions d'IA | **CliNER-MLOps** (LLM LoRA & Drift) | Application en production & MLOps (5 min pitch + 10 min Q&A) | Prêt | [`04_BLOC_4_MLOPS_CLINER/`](./04_BLOC_4_MLOPS_CLINER/) |
 
 ---
 
-## 🏗️ 2. Architecture Technique Globale
+## 1. Bloc 1 — Gouvernance des Données et Systèmes d'IA (Spotify)
+
+* **Objectif :** Définir et piloter une stratégie globale de gouvernance des données et de conformité réglementaire (RGPD, CCPA, AI Act) pour un service de streaming musical à grande échelle.
+* **Composants clés :**
+  * Évaluation de maturité selon le framework Gartner & DAMA-DMBOK (score initial 1.8/5 cible 3.8/5).
+  * Matrice RACI opérationnelle sur 33 tâches critiques et organisation en CoE Hybride (Hub & Spoke).
+  * Traitement des demandes d'accès (SARs Article 15 RGPD) et politique de minimisation des données.
+  * Projet pilote sur le système de recommandation musicale et traçabilité des modèles (DVC / MLflow).
+* **Livrables :** Rapport maître au format Word/PDF, support de soutenance 16:9, annexes d'audit Excel.
+* **Accès :** [`01_BLOC_1_GOUVERNANCE_SPOTIFY/LIVRABLES/`](./01_BLOC_1_GOUVERNANCE_SPOTIFY/LIVRABLES/)
+
+---
+
+## 2. Bloc 2 — Architecture Data & Calcul pour l'IA (Stripe)
+
+* **Objectif :** Concevoir une architecture cloud souveraine sur AWS (Région Paris `eu-west-3`) pour l'évaluation du risque de transaction en temps réel avec un SLA inférieur à 100 ms.
+* **Composants clés :**
+  * Cœur transactionnel OLTP en 3e Forme Normale (Aurora PostgreSQL, réplication Multi-AZ).
+  * Isolation bancaire conforme PCI-DSS Level 1 (Card Vault CloudHSM, chiffrement AES-256 CMK).
+  * Streaming asynchrone via Debezium CDC et Kafka MSK pour découpler la production de l'analytique.
+  * Entrepôt décisionnel Redshift Serverless modélisé en Schéma en Étoile (3 faits, 6 dimensions).
+  * Inférence d'IA sous 30 ms via FastAPI et ONNX Runtime sur CPU optimisés (c6i), couplé au Feature Store Feast (Redis).
+* **Livrables :** 9 rapports techniques d'architecture au format PDF, schémas relationnels et décisionnels (DBML et PNG), présentation de soutenance.
+* **Accès :** [`02_BLOC_2_ARCHITECTURE_STRIPE/LIVRABLES/`](./02_BLOC_2_ARCHITECTURE_STRIPE/LIVRABLES/)
+
+---
+
+## 3. Bloc 3 — Pipeline de Streaming & Détection de Fraude (Kafka)
+
+* **Objectif :** Déployer une chaîne complète de traitement de données temps réel et batch pour intercepter les transactions frauduleuses avant débit bancaire.
+* **Composants clés :**
+  * Ingestion streaming via cluster Apache Kafka en mode KRaft (3 partitions).
+  * Modèle de Machine Learning (`HistGradientBoostingClassifier`, Scikit-Learn) entraîné sur 555 719 transactions réelles (ROC-AUC : 0.986, inférence unitaire < 4 ms).
+  * API de scoring REST FastAPI conteneurisée (Docker).
+  * Résilience par Dead Letter Queue (`fraud-dlq`) pour l'isolation des messages corrompus.
+  * Double persistance : stockage colonne partitionné (Data Lake Parquet Snappy) et base relationnelle d'audit.
+  * Réconciliation quotidienne par batch ordonnancé via Apache Airflow.
+* **Livrables & Code :** Code source complet, conteneurs Docker, rapport technique d'architecture PDF, présentation de soutenance, vidéo de démonstration.
+* **Accès :** [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/)
+
+---
+
+## 4. Bloc 4 — Industrialisation, Déploiement & MLOps (CliNER-MLOps)
+
+* **Objectif :** Industrialiser en environnement de production une solution d'IA médicale pour l'extraction d'entités cliniques (Clinical NER) avec monitoring continu et réentraînement automatisé.
+* **Composants clés :**
+  * Architecture bicéphale : Embedder figé (BioBERT) et LLM génératif fine-tuné par adaptateur LoRA (Qwen-7B / PEFT).
+  * Détection de dérive (Data & Concept Drift) basée sur la distance de Wasserstein sur les embeddings de protocoles cliniques récents.
+  * Déclenchement automatique de réentraînement sur instance GPU AWS EC2 (`g4dn.xlarge`) avec protocole FinOps d'auto-arrêt (auto-kill).
+  * Registry MLflow avec validation de seuil de performance (F1-score) avant déploiement en production.
+* **Dépôt GitHub dédié :** [https://github.com/Elkristobal59/cliner-mlops](https://github.com/Elkristobal59/cliner-mlops)
+* **Livrables :** Support de soutenance, fiche de synthèse MLOps, guide d'entretien oral.
+* **Accès :** [`04_BLOC_4_MLOPS_CLINER/`](./04_BLOC_4_MLOPS_CLINER/)
+
+---
+
+## Structure du Dépôt
 
 ```text
-┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                          ARCHITECTURE TECHNIQUE HYBRIDE DU PIPELINE IA                            │
-│                                                                                                   │
-│  [SOURCES DE TRANSACTIONS]                                                                        │
-│  API Live Stream / POS Terminal ┐                                                                 │
-│  + Flux Replay Sécurisé         │                                                                 │
-│                                 ▼                                                                 │
-│                    ┌─────────────────────────┐                                                    │
-│                    │  PRODUCER KAFKA (KRaft) │ (Nettoyage & Sérialisation JSON)                   │
-│                    └────────────┬────────────┘                                                    │
-│                                 │ Publie vers topic 'raw-transactions'                            │
-│                                 ▼                                                                 │
-│                    ┌─────────────────────────┐                                                    │
-│                    │   BROKER APACHE KAFKA   │ ◄── Interface Web Kafka UI (http://localhost:8085) │
-│                    │    (3 Partitions)       │                                                    │
-│                    └────────────┬────────────┘                                                    │
-│                                 │                                                                 │
-│                ┌────────────────┴────────────────┐                                                │
-│                │ (Payload Valide)                │ (Payload Corrompu / Anomalie)                  │
-│                ▼                                 ▼                                                │
-│   ┌─────────────────────────┐       ┌─────────────────────────┐                                   │
-│   │ CONSUMER & SCORING ML   │       │ DEAD LETTER QUEUE (DLQ) │                                   │
-│   │ • Contrôle Schéma       │       │ • Topic 'fraud-dlq'     │                                   │
-│   │ • API FastAPI HTTP      │       │ • Table SQL DLQ         │                                   │
-│   └────────────┬────────────┘       └─────────────────────────┘                                   │
-│                │                                                                                  │
-│        ┌───────┴───────────────────────┐                                                          │
-│        ▼                               ▼                                                          │
-│ ┌──────────────┐             ┌─────────────────────┐                                              │
-│ │  ALERTE 🚨   │             │   DUAL PERSISTENCE  │                                              │
-│ │ Immédiate    │             │ 1. Data Lake Bronze │ ➔ Parquet horodaté partitionné               │
-│ │ Console & Log│             │ 2. BDD SQL          │ ➔ Transactions enrichies & masquées          │
-│ └──────────────┘             └──────────┬──────────┘                                              │
-│                                         │                                                         │
-│                                         ▼                                                         │
-│                              ┌─────────────────────┐                                              │
-│                              │  DAG APACHE AIRFLOW │ (Batch Matinal Quotidien 06h00 UTC)          │
-│                              │  Audit & Reporting  │ ➔ Synthèse KPIs, Taux & Volume Sauvegardé    │
-│                              └─────────────────────┘                                              │
-└───────────────────────────────────────────────────────────────────────────────────────────────────┘
+CERTIFICATION_AIA/
+├── 01_BLOC_1_GOUVERNANCE_SPOTIFY/
+│   ├── LIVRABLES/         # Dossier maître, politiques DMBOK, RACI, présentation PPTX
+│   └── README.md          # Synthèse du projet et cadre méthodologique
+├── 02_BLOC_2_ARCHITECTURE_STRIPE/
+│   ├── LIVRABLES/         # 9 rapports techniques PDF, présentation PPTX, modèles DBML/PNG
+│   └── README.md          # Synthèse d'architecture cloud et SLA de latence
+├── 03_BLOC_3_PIPELINE_FRAUD_DETECTION/
+│   ├── LIVRABLES/         # Rapport d'architecture PDF, support PPTX, fiche démo
+│   ├── 01_train/          # Scripts et modèle de scoring entraîné
+│   ├── 02_api/            # Microservice FastAPI Dockerisé
+│   ├── 03_pipeline_streaming/ # Broker Kafka, Consumer, Alerting, DLQ
+│   ├── 04_batch_airflow/  # DAG d'audit matinal et réconciliation
+│   ├── 05_database/       # Gestionnaire de base de données relationnelle
+│   ├── run_full_pipeline_demo.py # Script d'exécution de la démonstration
+│   └── README.md          # Guide technique de reproduction pas à pas
+├── 04_BLOC_4_MLOPS_CLINER/
+│   ├── LIVRABLES/         # Présentation de soutenance, synthèse MLOps
+│   └── README.md          # Synthèse de la solution et lien vers le dépôt de code
+└── README.md              # Ce document
 ```
 
 ---
 
-## 📂 3. Organisation Modulaire du Code
+## Modalités d'Évaluation (RNCP 41993)
 
-```text
-├── .gitignore                                 # Exclusion des données brutes volumineuses et secrets
-├── README.md                                  # Documentation technique de référence
-├── ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx     # Support de présentation d'architecture
-├── sample_fraud_data.csv                      # Échantillon de données prêt pour les tests
-│
-├── 01_train/                                  # Entraînement ML & Tracking d'expérimentation
-│   ├── train_model.py                         # Algorithme HistGradientBoosting + Tracking MLflow
-│   ├── fraud_model.joblib                     # Artefact de production sérialisé
-│   └── model_metadata.json                    # Métriques de performance (Recall: 92.4%, ROC-AUC: 0.986)
-│
-├── 02_api/                                    # Microservice d'inférence temps réel (FastAPI)
-│   ├── app.py                                 # Routes /health, /predict, /predict-raw
-│   ├── Dockerfile                             # Conteneurisation multi-stage ultra-légère
-│   ├── cloudbuild.yaml                        # Configuration CI/CD Google Cloud Build
-│   ├── deploy_cloud_run.sh                    # Script de déploiement Serverless (Linux/macOS)
-│   ├── deploy_cloud_run.ps1                   # Script de déploiement Serverless (PowerShell)
-│   └── requirements.txt                       # Dépendances de production épinglées
-│
-├── 03_pipeline_streaming/                     # Tuyauterie événementielle Apache Kafka
-│   ├── producer.py                            # Ingestion continue et publication dans Kafka
-│   ├── consumer.py                            # Consommation des messages, scoring et persistence
-│   ├── alert_service.py                       # Moteur d'alerte flash et journalisation immuable
-│   └── docker-compose.kafka.yml               # Cluster Kafka KRaft + Kafka UI
-│
-├── 04_batch_airflow/                          # Batch d'audit matinal et réconciliation
-│   ├── daily_fraud_audit_dag.py               # Définition du DAG planifié à 06h00 UTC
-│   ├── run_daily_audit.py                     # Exécuteur autonome du rapport matinal
-│   └── RAPPORT_AUDIT_MATINAL_QUOTIDIEN.md     # Rapport consolidé généré pour la direction
-│
-└── 05_database/                               # Persistance relationnelle & DDL
-    ├── schema.sql                             # DDL SQL (transactions, fraud_alerts, DLQ, audit)
-    ├── db_manager.py                          # Client SQL ACID + partitionnement Parquet Data Lake
-    └── fraud_pipeline.db                      # Base opérationnelle
-```
-
----
-
-## ⚡ 4. Guide de Démarrage & Exécution
-
-### Prérequis Système :
-* **Docker & Docker Compose** installés et actifs.
-* **Python 3.10+** avec environnement virtuel recommandé.
-* Dépendances Python installées :
-```bash
-pip install -r 02_api/requirements.txt confluent-kafka pyarrow
-```
-
----
-
-### Étape 1 : Démarrer le Cluster Kafka & l'API d'Inférence
-
-1. **Lancer le broker Kafka KRaft et son interface web :**
-```bash
-docker compose -f 03_pipeline_streaming/docker-compose.kafka.yml up -d
-```
-> 💡 *Accédez au Dashboard Kafka UI : [http://localhost:8085](http://localhost:8085)*
-
-2. **Lancer le microservice d'inférence conteneurisé :**
-```bash
-docker build -t fraud-scoring-api:latest -f 02_api/Dockerfile .
-docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest
-```
-> 💡 *Vérification du service : `curl http://localhost:8080/health`*
-
----
-
-### Étape 2 : Lancer le Pipeline de Streaming
-
-Dans un premier terminal, démarrez le **Consommateur de streaming** :
-```bash
-python 03_pipeline_streaming/consumer.py
-```
-*Le consommateur écoute le topic `raw-transactions`, valide le schéma de chaque message, appelle l'API d'inférence, route les anomalies vers la DLQ, masque les cartes selon PCI-DSS et persiste dans le Data Lake Parquet.*
-
-Dans un second terminal, démarrez le **Producteur d'événements** :
-```bash
-python 03_pipeline_streaming/producer.py
-```
-*Le producteur interroge les flux de paiement et publie les transactions en continu dans Kafka.*
-
----
-
-### Étape 3 : Exécuter l'Audit Matinal Quotidien
-
-Pour déclencher le calcul batch des KPIs de la veille (DAG Apache Airflow) :
-```bash
-python 04_batch_airflow/run_daily_audit.py
-```
-*Génère le rapport de synthèse exécutif dans `04_batch_airflow/RAPPORT_AUDIT_MATINAL_QUOTIDIEN.md`.*
-
----
-
-## 🛡️ 5. Sécurité, Gouvernance & Conformité PCI-DSS
-
-### Masquage Strict des Données Bancaires (PCI-DSS v4.0) :
-Le numéro de carte bancaire (PAN) ne transite jamais et n'est **jamais stocké en clair** :
-* Application de la règle des **6 premiers (BIN) et 4 derniers chiffres** : `453288******9812`.
-* Pseudonymisation cryptographique des identités porteurs (Privacy-by-Design RGPD).
-
-### Résilience & Dead Letter Queue (DLQ) :
-Tout événement corrompu (montant négatif, schéma JSON invalide, données tronquées) est automatiquement isolé :
-* Topic Kafka dédié : `fraud-dlq`.
-* Table d'audit SQL : `dead_letter_queue`.
-* Le pipeline principal continue son exécution sans blocage ni perte de données.
-
----
-
-## ☁️ 6. Déploiement Cloud Serverless (GCP Cloud Run)
-
-Pour basculer du runtime local au cloud managé, le service d'inférence s'intègre nativement à Google Cloud Run avec politique de **Scale-to-Zero** :
-* **Facturation à l'usage strict** : `min-instances: 0` (0 € hors requête active).
-* **Mise à l'échelle automatique** : jusqu'à 5 instances sous forte charge.
-* **Script de déploiement automatisé :**
-```bash
-bash 02_api/deploy_cloud_run.sh
-```
-Ou via PowerShell :
-```powershell
-.\02_api\deploy_cloud_run.ps1 -ProjectId "votre-projet-gcp"
-```
-
----
-
-## 📈 7. Performances & Métriques du Modèle
-
-* **Algorithme :** `HistGradientBoostingClassifier` avec rééquilibrage de classes.
-* **ROC-AUC :** `0.9866`
-* **Rappel Fraude (Recall) :** `92.4 %` des transactions frauduleuses interceptées.
-* **Latence moyenne d'inférence :** `< 15 ms` par requête.
-* **Traçabilité :** Paramètres, métriques et artefacts loggués dans MLflow avec enregistrement dans le Model Registry.
+L'examen final se déroule sous la forme d'une soutenance orale séquentielle continue de 1h25 (85 minutes) devant un jury de professionnels :
+* **Bloc 1 (Gouvernance) :** 15 min de présentation + 15 min de questions/réponses (30 min)
+* **Bloc 2 (Architecture) :** 5 min de présentation + 15 min de questions/réponses (20 min)
+* **Bloc 3 (Pipelines) :** 5 min de présentation + 15 min de questions/réponses (20 min)
+* **Bloc 4 (MLOps) :** 5 min de présentation + 10 min de questions/réponses (15 min)
