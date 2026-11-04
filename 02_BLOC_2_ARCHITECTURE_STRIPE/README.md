@@ -58,7 +58,6 @@ Tous les livrables d'ingénierie sont regroupés au format PDF et schémas exéc
 | `07_ML_Integration_Strategy.pdf` | PDF | Budget de latence p99 (< 100 ms), Feature Store Feast Redis et inférence ONNX. |
 | `08_SQL_NoSQL_Queries.pdf` | PDF | Requêtes d'analyse décisionnelle et opérations NoSQL documentées. |
 | `PRESENTATION_STRIPE_BLOC2.pptx` | PPTX | Support officiel de soutenance orale (6 slides avec notes d'orateur). |
-| `SPEECH_ORAL_BLOC_2_STRIPE_5MIN.pdf` | PDF | Fiche de déroulé et repères temporels de la soutenance (5 minutes chrono). |
 | `stripe_oltp.dbml` & `stripe_olap.dbml` | DBML | Code source de la modélisation des bases de données relationnelle et analytique. |
 | `stripe_oltp_erd.png` & `stripe_olap_schema.png` | PNG | Diagrammes graphiques haute résolution des schémas de données. |
 | `Stripe_Dossier_Livrables_Bloc2.zip` | ZIP | Archive officielle consolidée déposée sur Julie LMS. |

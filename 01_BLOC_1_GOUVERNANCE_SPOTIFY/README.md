@@ -47,6 +47,5 @@ Tous les livrables finaux sont réunis dans le répertoire [`LIVRABLES/`](./LIVR
 | `02_Schema_Roles_et_Responsabilites_RACI_Spotify.pptx` | PPTX | Schéma visuel de l'organisation Hub & Spoke. |
 | `03_Plan_Mise_en_Oeuvre_et_Projet_Pilote_Spotify.docx` | Word | Feuille de route du projet pilote sur la recommandation musicale. |
 | `04_Presentation_Executive_Gouvernance_Spotify.pptx` | PPTX | Support officiel de soutenance orale (15 minutes). |
-| `SPEECH_ORAL_BLOC_1_SPOTIFY_15MIN.pdf` | PDF | Fiche de déroulé et repères temporels de la soutenance. |
 | `Spotify_Dossier_Livrables_Bloc1.zip` | ZIP | Archive officielle consolidée déposée sur Julie LMS. |
 

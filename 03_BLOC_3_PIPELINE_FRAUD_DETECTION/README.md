@@ -106,6 +106,5 @@ Tous les documents d'évaluation sont réunis dans [`LIVRABLES/`](./LIVRABLES/) 
 | `ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx` | PPTX | Slides modifiables avec notes d'orateur complètes. |
 | `RAPPORT_ARCHITECTURE_TECHNIQUE_PIPELINE.pdf` | PDF | Rapport technique d'ingénierie et justifications de conception. |
 | `LIEN_DEMO_VIDEO.pdf` | PDF | Fiche officielle récapitulative des liens et scénario de démo. |
-| `SPEECH_ORAL_BLOC_3_FRAUD_KAFKA_5MIN.pdf` | PDF | Déroulé chronométré de l'épreuve orale. |
 | `schema_architecture_infrastructure_fraud.png` | PNG | Diagramme haute résolution de l'architecture. |
 | `Fraud_Detection_Livrables_Bloc3.zip` | ZIP | Archive officielle consolidée déposée sur Julie LMS. |
