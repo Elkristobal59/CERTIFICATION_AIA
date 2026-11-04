@@ -45,3 +45,4 @@ Les supports de présentation et synthèses techniques sont réunis dans [`LIVRA
 
 Le code source complet, les Dockerfiles, les configurations CI/CD et les scripts de déploiement sont consultables sur le dépôt public dédié :  
 👉 **[https://github.com/Elkristobal59/cliner-mlops](https://github.com/Elkristobal59/cliner-mlops)**
+

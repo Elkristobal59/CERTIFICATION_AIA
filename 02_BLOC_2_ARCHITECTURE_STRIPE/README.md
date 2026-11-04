@@ -62,3 +62,4 @@ Tous les livrables d'ingénierie sont regroupés au format PDF et schémas exéc
 | `stripe_oltp.dbml` & `stripe_olap.dbml` | DBML | Code source de la modélisation des bases de données relationnelle et analytique. |
 | `stripe_oltp_erd.png` & `stripe_olap_schema.png` | PNG | Diagrammes graphiques haute résolution des schémas de données. |
 | `Stripe_Dossier_Livrables_Bloc2.zip` | ZIP | Archive officielle consolidée déposée sur Julie LMS. |
+

@@ -111,3 +111,4 @@ L'examen final se déroule sous la forme d'une soutenance orale séquentielle co
 * **Bloc 2 (Architecture) :** 5 min de présentation + 15 min de questions/réponses (20 min)
 * **Bloc 3 (Pipelines) :** 5 min de présentation + 15 min de questions/réponses (20 min)
 * **Bloc 4 (MLOps) :** 5 min de présentation + 10 min de questions/réponses (15 min)
+

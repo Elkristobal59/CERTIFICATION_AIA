@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 def create_architecture_diagram():
-    output_dir = r"D:\AIL-FT-02\CERTIF AIL\FRAUD_DETECTION_BLOC_3\01_LIVRABLES"
+    output_dir = r"D:\AIL-FT-02\CERTIF AIL\FRAUD_DETECTION_BLOC_3\03_BLOC_3_PIPELINE_FRAUD_DETECTION\LIVRABLES"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "schema_architecture_infrastructure_fraud.png")
 
@@ -193,7 +193,7 @@ def create_architecture_diagram():
         y_rncp -= 0.62
 
     # Signature auteur
-    ax.text(6.1, 0.70, "Candidat : Chris GILLERON  |  Certification Architecte IA  |  Dépôt Officiel : github.com/Elkristobal59/CERTIFICATION_AIA", 
+    ax.text(6.1, 0.70, "Candidat : Christopher GILLERON  |  Certification Architecte IA  |  Dépôt Officiel : github.com/Elkristobal59/CERTIFICATION_AIA", 
             ha='center', va='center', fontsize=8.5, color='#64748B', style='italic', family='sans-serif', zorder=3)
 
     plt.tight_layout()

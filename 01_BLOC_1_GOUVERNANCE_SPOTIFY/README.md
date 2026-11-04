@@ -49,3 +49,4 @@ Tous les livrables finaux sont réunis dans le répertoire [`LIVRABLES/`](./LIVR
 | `04_Presentation_Executive_Gouvernance_Spotify.pptx` | PPTX | Support officiel de soutenance orale (15 minutes). |
 | `SPEECH_ORAL_BLOC_1_SPOTIFY_15MIN.pdf` | PDF | Fiche de déroulé et repères temporels de la soutenance. |
 | `Spotify_Dossier_Livrables_Bloc1.zip` | ZIP | Archive officielle consolidée déposée sur Julie LMS. |
+
