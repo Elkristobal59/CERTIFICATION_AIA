@@ -2,166 +2,257 @@ import os
 import sys
 import time
 import json
+import importlib
 
-# Forcer l'encodage console UTF-8
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-import numpy as np
-import pandas as pd
 import joblib
-from sklearn.ensemble import HistGradientBoostingClassifier
+import pandas as pd
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, roc_auc_score, recall_score, precision_score, f1_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
-# Support MLflow pour le Model Tracking & Registry
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+features_mod = importlib.import_module("01_train.features")
+load_project_env = features_mod.load_project_env
+prepare_features = features_mod.prepare_features
+FEATURE_COLUMNS = features_mod.FEATURE_COLUMNS
+
+load_project_env()
+
 try:
     import mlflow
     import mlflow.sklearn
+    from mlflow.models import infer_signature
+    from mlflow.tracking import MlflowClient
     MLFLOW_AVAILABLE = True
 except ImportError:
     MLFLOW_AVAILABLE = False
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CSV_PATH = os.path.join(BASE_DIR, "fraudTest.csv")
+PARENT_CSV_PATH = os.path.join(os.path.dirname(BASE_DIR), "fraudTest.csv")
+LOCAL_CSV_PATH = os.path.join(BASE_DIR, "fraudTest.csv")
+SAMPLE_CSV_PATH = os.path.join(BASE_DIR, "sample_fraud_data.csv")
 MODEL_DIR = os.path.join(BASE_DIR, "01_train")
 MODEL_PATH = os.path.join(MODEL_DIR, "fraud_model.joblib")
 META_PATH = os.path.join(MODEL_DIR, "model_metadata.json")
-MLFLOW_DB_PATH = os.path.join(BASE_DIR, "mlflow.db")
 
-def haversine_np(lon1, lat1, lon2, lat2):
-    """Calcule la distance en kilomètres entre porteur de carte et marchand."""
-    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = np.sin(dlat / 2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0)**2
-    return 6367 * 2 * np.arcsin(np.sqrt(a))
 
-def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Extrait et prépare les caractéristiques clés pour la détection de fraude."""
-    X = pd.DataFrame()
-    X['amt'] = df['amt'].astype(float)
-    X['city_pop'] = df['city_pop'].fillna(1000).astype(float)
-    
-    # Distance géographique réelle
-    X['distance_km'] = haversine_np(df['long'], df['lat'], df['merch_long'], df['merch_lat'])
-    
-    # Heure de la transaction (support trans_date_trans_time ou current_time)
-    time_col = 'trans_date_trans_time' if 'trans_date_trans_time' in df.columns else 'current_time'
-    if time_col in df.columns:
-        dt = pd.to_datetime(df[time_col], errors='coerce')
-        X['hour'] = dt.dt.hour.fillna(12).astype(int)
-    else:
-        X['hour'] = 12
+def resolve_dataset_path() -> str:
+    for candidate in (LOCAL_CSV_PATH, PARENT_CSV_PATH, SAMPLE_CSV_PATH):
+        if os.path.exists(candidate):
+            return candidate
+    raise FileNotFoundError("Aucun fichier d'entraînement trouvé (fraudTest.csv ou sample_fraud_data.csv).")
 
-    # Âge du porteur de carte
-    if 'dob' in df.columns:
-        dob_dt = pd.to_datetime(df['dob'], errors='coerce')
-        X['age'] = (2026 - dob_dt.dt.year).fillna(40).astype(int)
-    else:
-        X['age'] = 40
-        
-    return X
+
+def build_candidate_models():
+    """Retourne les pipelines candidats intégrant StandardScaler + classifieur."""
+    return [
+        (
+            "LogisticRegression_Balanced",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("classifier", LogisticRegression(class_weight="balanced", max_iter=500, random_state=42)),
+            ]),
+            {"algorithm": "LogisticRegression", "class_weight": "balanced", "max_iter": 500, "scaler": "StandardScaler"},
+        ),
+        (
+            "RandomForest_Balanced",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                (
+                    "classifier",
+                    RandomForestClassifier(
+                        n_estimators=80, max_depth=12, class_weight="balanced", n_jobs=-1, random_state=42
+                    ),
+                ),
+            ]),
+            {
+                "algorithm": "RandomForestClassifier",
+                "n_estimators": 80,
+                "max_depth": 12,
+                "class_weight": "balanced",
+                "scaler": "StandardScaler",
+            },
+        ),
+        (
+            "HistGradientBoosting_Balanced",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                (
+                    "classifier",
+                    HistGradientBoostingClassifier(
+                        class_weight="balanced", max_iter=150, learning_rate=0.08, max_depth=6, random_state=42
+                    ),
+                ),
+            ]),
+            {
+                "algorithm": "HistGradientBoostingClassifier",
+                "class_weight": "balanced",
+                "max_iter": 150,
+                "learning_rate": 0.08,
+                "max_depth": 6,
+                "scaler": "StandardScaler",
+            },
+        ),
+    ]
+
 
 def train():
-    print("=" * 65)
-    print("🚀 ENTRAÎNEMENT DU MODÈLE DE DÉTECTION DE FRAUDE — BLOC 3")
-    print("   Tracking Expérimentations & Model Registry avec MLflow")
-    print("=" * 65)
-    print(f"📖 Chargement des données historiques : {CSV_PATH}")
-    
-    t0 = time.time()
-    # Chargement d'un sous-ensemble représentatif (200 000 lignes)
-    df = pd.read_csv(CSV_PATH, nrows=200000)
-    print(f"✅ Données chargées : {len(df)} transactions (Fraudes : {df['is_fraud'].sum()})")
-    
-    print("⚙️ Feature Engineering (Distance Haversine, Âge, Heure)...")
+    print("=" * 72)
+    print("🚀 BENCHMARK & ENTRAÎNEMENT MULTI-MODÈLES MLFLOW — BLOC 3 (RNCP 41993)")
+    print("=" * 72)
+
+    csv_path = resolve_dataset_path()
+    print(f"📖 Chargement intégral du dataset : {csv_path}")
+    df = pd.read_csv(csv_path)
+    frauds_total = int(df["is_fraud"].sum())
+    print(f"✅ Dataset chargé : {len(df):,} transactions ({frauds_total:,} fraudes | {frauds_total / len(df) * 100:.2f} %)")
+
+    print("⚙️ Feature Engineering partagé (Distance Haversine, Heure, Âge, Densité)...")
     X = prepare_features(df)
-    y = df['is_fraud']
-    
-    features = ['amt', 'distance_km', 'city_pop', 'hour', 'age']
-    X = X[features]
-    
+    y = df["is_fraud"].astype(int)
+
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y, random_state=42
     )
-    
-    params = {
-        "class_weight": "balanced",
-        "max_iter": 120,
-        "learning_rate": 0.08,
-        "max_depth": 6,
-        "random_state": 42
-    }
-    
-    print(f"🧠 Entraînement de l'algorithme HistGradientBoosting (balanced)...")
-    model = HistGradientBoostingClassifier(**params)
-    model.fit(X_train, y_train)
-    
-    print("📊 Évaluation des performances sur le jeu de test...")
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
-    
-    roc_auc = roc_auc_score(y_test, y_prob)
-    recall = recall_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    
-    print(f"  • ROC-AUC Score : {roc_auc:.4f}")
-    print(f"  • Recall Fraude : {recall:.4f} (87%+ des fraudes interceptées)")
-    print(f"  • Precision     : {precision:.4f}")
-    print(f"  • F1-Score      : {f1:.4f}")
-    
-    print(f"\n💾 Sérialisation du modèle : {MODEL_PATH}")
-    joblib.dump(model, MODEL_PATH)
-    
-    metadata = {
-        "model_type": "HistGradientBoostingClassifier",
-        "features": features,
-        "parameters": params,
-        "sample_size": len(df),
-        "metrics": {
-            "roc_auc": round(float(roc_auc), 4),
-            "recall": round(float(recall), 4),
-            "precision": round(float(precision), 4),
-            "f1": round(float(f1), 4)
-        },
-        "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "training_duration_sec": round(time.time() - t0, 2)
-    }
-    
-    with open(META_PATH, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
-        
-    print(f"✅ Métadonnées sauvegardées : {META_PATH}")
-    
-    # Intégration MLflow Tracking & Model Registry
+
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "RealTime_Fraud_Detection_AIA_Bloc3")
+    registered_model_name = os.getenv("MLFLOW_MODEL_NAME", "fraud_detection_model")
+
+    mlflow_ready = False
     if MLFLOW_AVAILABLE:
         try:
-            tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", f"sqlite:///{MLFLOW_DB_PATH.replace(os.sep, '/')}")
             mlflow.set_tracking_uri(tracking_uri)
-            mlflow.set_experiment("RealTime_Fraud_Detection_AIA_Bloc3")
-            
-            with mlflow.start_run(run_name="HistGB_Balanced_v2"):
-                mlflow.log_params(params)
-                mlflow.log_param("sample_size", len(df))
-                mlflow.log_param("features", ",".join(features))
-                mlflow.log_metrics({
-                    "roc_auc": float(roc_auc),
-                    "recall": float(recall),
-                    "precision": float(precision),
-                    "f1": float(f1),
-                    "duration_seconds": float(time.time() - t0)
-                })
-                mlflow.log_artifact(MODEL_PATH, artifact_path="model")
-                mlflow.log_artifact(META_PATH, artifact_path="metadata")
-            print(f"🌟 MLflow Run consigné avec succès (Tracking: {tracking_uri})")
-        except Exception as e:
-            print(f"⚠️ MLflow logging ignoré ({e})")
-            
-    print(f"⏱️ Entraînement complété en {time.time() - t0:.2f}s !")
-    print("=" * 65)
+            mlflow.set_experiment(experiment_name)
+            mlflow_ready = True
+            print(f"📡 Connecté au serveur MLflow : {tracking_uri}")
+        except Exception as exc:
+            print(f"⚠️ Serveur MLflow injoignable ({exc}). Entraînement poursuivi en local.")
+
+    results = []
+    signature = infer_signature(X_train.head(50), pd.Series([0, 1] * 25)[:50]) if mlflow_ready else None
+
+    for run_name, pipeline, params in build_candidate_models():
+        t0 = time.time()
+        print(f"\n🧠 Entraînement : {run_name} ...")
+        pipeline.fit(X_train, y_train)
+        train_sec = round(time.time() - t0, 2)
+
+        y_pred = pipeline.predict(X_test)
+        y_prob = pipeline.predict_proba(X_test)[:, 1]
+
+        metrics = {
+            "roc_auc": round(float(roc_auc_score(y_test, y_prob)), 4),
+            "pr_auc": round(float(average_precision_score(y_test, y_prob)), 4),
+            "recall": round(float(recall_score(y_test, y_pred)), 4),
+            "precision": round(float(precision_score(y_test, y_pred, zero_division=0)), 4),
+            "f1": round(float(f1_score(y_test, y_pred, zero_division=0)), 4),
+            "training_duration_sec": train_sec,
+        }
+        print(
+            f"   ➔ ROC-AUC={metrics['roc_auc']:.4f} | PR-AUC={metrics['pr_auc']:.4f} "
+            f"| Recall={metrics['recall']*100:.1f}% | F1={metrics['f1']:.4f} ({train_sec}s)"
+        )
+
+        model_version = None
+        run_id = None
+        if mlflow_ready:
+            try:
+                with mlflow.start_run(run_name=run_name) as run:
+                    run_id = run.info.run_id
+                    mlflow.log_params(params)
+                    mlflow.log_param("sample_size", len(df))
+                    mlflow.log_param("train_size", len(X_train))
+                    mlflow.log_param("test_size", len(X_test))
+                    mlflow.log_param("features", ",".join(FEATURE_COLUMNS))
+                    mlflow.log_metrics(metrics)
+                    model_info = mlflow.sklearn.log_model(
+                        sk_model=pipeline,
+                        name="model",
+                        signature=signature,
+                        input_example=X_train.head(5),
+                        serialization_format="cloudpickle",
+                        pip_requirements=[
+                            "scikit-learn==1.7.2",
+                            "pandas",
+                            "numpy",
+                            "joblib",
+                        ],
+                        registered_model_name=registered_model_name,
+                    )
+                    model_version = model_info.registered_model_version
+            except Exception as exc:
+                print(f"   ⚠️ Erreur enregistrement MLflow pour {run_name} : {exc}")
+
+        results.append({
+            "run_name": run_name,
+            "pipeline": pipeline,
+            "params": params,
+            "metrics": metrics,
+            "run_id": run_id,
+            "model_version": model_version,
+        })
+
+    # Sélection objective du meilleur modèle sur ROC-AUC puis PR-AUC
+    ranked = sorted(results, key=lambda r: (r["metrics"]["roc_auc"], r["metrics"]["pr_auc"]), reverse=True)
+    champion = ranked[0]
+    challenger = ranked[1] if len(ranked) > 1 else None
+
+    print("\n" + "-" * 72)
+    print(f"🏆 MODÈLE CHAMPION SÉLECTIONNÉ : {champion['run_name']} (ROC-AUC={champion['metrics']['roc_auc']})")
+
+    if mlflow_ready and champion["model_version"] is not None:
+        try:
+            client = MlflowClient(tracking_uri=tracking_uri)
+            client.set_registered_model_alias(registered_model_name, "champion", str(champion["model_version"]))
+            print(f"   🔖 Alias MLflow '@champion' attribué à {registered_model_name} v{champion['model_version']}")
+            if challenger and challenger["model_version"] is not None:
+                client.set_registered_model_alias(registered_model_name, "challenger", str(challenger["model_version"]))
+                print(f"   🥈 Alias MLflow '@challenger' attribué à {registered_model_name} v{challenger['model_version']}")
+        except Exception as exc:
+            print(f"   ⚠️ Impossible d'assigner les alias MLflow : {exc}")
+
+    # Sauvegarde locale de secours (pour conteneur autonome si MLflow hors ligne)
+    joblib.dump(champion["pipeline"], MODEL_PATH)
+    size_bytes = os.path.getsize(MODEL_PATH)
+
+    metadata = {
+        "model_name": registered_model_name,
+        "alias": "champion",
+        "champion_run_name": champion["run_name"],
+        "model_type": champion["params"]["algorithm"],
+        "preprocessing": "StandardScaler + Haversine Feature Engineering",
+        "features": list(FEATURE_COLUMNS),
+        "parameters": champion["params"],
+        "sample_size": len(df),
+        "fraud_count_dataset": frauds_total,
+        "metrics": champion["metrics"],
+        "mlflow_run_id": champion["run_id"],
+        "mlflow_version": champion["model_version"],
+        "artifact_size_bytes": size_bytes,
+        "benchmark": [
+            {"run_name": r["run_name"], "metrics": r["metrics"], "mlflow_version": r["model_version"]}
+            for r in ranked
+        ],
+        "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    with open(META_PATH, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    print(f"💾 Modèle sérialisé : {MODEL_PATH} ({size_bytes / 1024:.1f} Ko)")
+    print(f"✅ Métadonnées enregistrées : {META_PATH}")
+    print("=" * 72)
+
 
 if __name__ == "__main__":
     train()

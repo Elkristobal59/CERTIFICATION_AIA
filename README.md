@@ -1,100 +1,18 @@
-# Certification Architecte en Intelligence Artificielle (RNCP 41993 - Niveau 7)
+# 🎓 Certification Architecte en Intelligence Artificielle — RNCP 41993 (Bloc 3)
 
-Dépôt officiel des livrables et projets techniques présentés dans le cadre de la certification professionnelle d'Architecte en Intelligence Artificielle (Jedha Bootcamp / France Compétences).
+Dépôt principal hébergeant l'architecture hybride **Détection de Fraude Bancaire Temps Réel & Batch Medallion (Bloc 3 — Concevoir et mettre en œuvre des pipelines de données pour l'IA)**, combinant conteneurs **Docker locaux** et services managés **Neon PostgreSQL (`eu-central-1`) + AWS S3 (`eu-west-3`) + Gmail SMTP TLS**.
 
----
+## 📂 Organisation du Dépôt
 
-## Vue d'ensemble des 4 Blocs de Compétences
-
-Ce dépôt centralise les travaux d'ingénierie, architectures, codes sources et livrables officiels répartis selon les 4 blocs du référentiel RNCP 41993 :
-
-| Bloc | Intitulé officiel | Cas d'étude / Projet | Emplacement / Dépôt |
-| :---: | :--- | :--- | :--- |
-| **Bloc 1** | Concevoir et piloter la gouvernance des données et des systèmes d'IA | **Spotify** (Gouvernance & RGPD) | [`01_BLOC_1_GOUVERNANCE_SPOTIFY/`](./01_BLOC_1_GOUVERNANCE_SPOTIFY/) |
-| **Bloc 2** | Concevoir et déployer l'infrastructure de données et de calcul pour l'IA | **Stripe** (Architecture Cloud Souveraine) | [`02_BLOC_2_ARCHITECTURE_STRIPE/`](./02_BLOC_2_ARCHITECTURE_STRIPE/) |
-| **Bloc 3** | Concevoir et mettre en œuvre des pipelines de données pour l'IA | **Fraud Detection** (Streaming Kafka & Batch) | [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/) |
-| **Bloc 4** | Concevoir et piloter l'industrialisation et le déploiement de solutions d'IA | **CliNER-MLOps** (LLM LoRA & Drift) | [Dépôt dédié `cliner-mlops`](https://github.com/Elkristobal59/cliner-mlops) |
+* [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](03_BLOC_3_PIPELINE_FRAUD_DETECTION/README.md) — **Code applicatif complet, Docker Compose, scripts Python, DAG Airflow et livrables officiels** :
+  * `01_train/` : Feature engineering partagé (`features.py`), benchmark multi-modèles MLflow (`train_model.py`, notebook) connecté à **Neon `fraud_mlflow_db`** + **AWS S3 (`eu-west-3`)** sur `555 719` transactions (`HistGradientBoosting` `@champion` ROC-AUC `0.9876`, `RandomForest` `@challenger` ROC-AUC `0.9836`).
+  * `02_api/` : Microservice **FastAPI** + Pydantic strict (`POST /predict`, `/predict-raw`, `/reload-model`, latence médiane `19.4 ms`, p95 `28.9 ms`).
+  * `03_pipeline_streaming/` : Producteur/Consommateur **confluent-kafka**, **Pandera Quality Gate**, quarantaine **DLQ**, et alerting réel **`smtplib`** (**Gmail SMTP TLS** / fallback **Mailpit**).
+  * `04_batch_airflow/` : DAG **Apache Airflow 2.11** à 3 tâches (`etl_bronze_to_silver >> gold_audit_and_drift >> check_retrain_trigger`), rapports Markdown quotidiens et événements **OpenLineage**.
+  * `05_database/` : Schéma **PostgreSQL** déployé sur **Neon Serverless SSL (`fraud_db`)**, masquage PCI-DSS `**** **** **** 1234`, pseudonymisation RGPD **SHA-256 salé** (`SECRET_SALT` via `.env`) et couche **Data Lake Medallion Parquet** (`bronze/`, `silver/`, `gold/`, `rejected/`, `lineage/`).
+  * `LIVRABLES/` : Schéma PNG, présentation PPTX/PDF, rapport d'architecture PDF, guide vidéo PDF et archive ZIP prête au dépôt (`Fraud_Detection_Livrables_Bloc3.zip`).
+* [`02_PREPARATION_ORAL/`](02_PREPARATION_ORAL/FICHE_REVISION_MASTER_BLOC3_ORAL.md) — Supports et fiches de révision pour la soutenance Bloc 3 (5 min pitch + 15 min Q&A).
 
 ---
 
-## 1. Bloc 1 — Gouvernance des Données et Systèmes d'IA (Spotify)
-
-* **Objectif :** Définir et piloter une stratégie globale de gouvernance des données et de conformité réglementaire (RGPD, CCPA, AI Act) pour un service de streaming musical à grande échelle.
-* **Composants clés :**
-  * Évaluation de maturité selon le framework Gartner & DAMA-DMBOK2 (score initial 1.8/5 cible 3.8/5).
-  * Matrice RACI opérationnelle sur 33 tâches critiques et organisation en CoE Hybride (Hub & Spoke).
-  * Traitement des demandes d'accès (SARs Article 15 RGPD) et politique de minimisation des données.
-  * Projet pilote sur le système de recommandation musicale et traçabilité des modèles (DVC / MLflow).
-* **Livrables :** Rapport maître au format Word/PDF, support de soutenance 16:9 (`.pptx`), annexes d'audit Excel.
-* **Accès :** [`01_BLOC_1_GOUVERNANCE_SPOTIFY/LIVRABLES/`](./01_BLOC_1_GOUVERNANCE_SPOTIFY/LIVRABLES/)
-
----
-
-## 2. Bloc 2 — Architecture Data & Calcul pour l'IA (Stripe)
-
-* **Objectif :** Concevoir une architecture cloud souveraine sur AWS (Région Paris `eu-west-3`) pour l'évaluation du risque de transaction en temps réel avec un SLA inférieur à 100 ms.
-* **Composants clés :**
-  * Cœur transactionnel OLTP en 3e Forme Normale (12 tables : paiements, abonnements, litiges, référentiels sur Aurora PostgreSQL Multi-AZ).
-  * Isolation bancaire & conformité PCI-DSS Level 1, RGPD et CCPA (Card Vault CloudHSM, chiffrement AES-256 CMK, gestion *Opt-Out*).
-  * Stockage NoSQL polyglotte (Amazon DocumentDB : JSON, XML ISO 20022/SEPA, retours NLP, vecteurs SHAP) & streaming Debezium CDC, Kafka MSK et Kinesis Firehose.
-  * Entrepôt décisionnel Redshift Serverless modélisé en Schéma en Étoile (4 tables de faits, 1 synthèse produit et 7 dimensions).
-  * Inférence d'IA sous 30 ms via FastAPI/ONNX Runtime (Radar Fraude, Adaptive Checkout) & modèles batch SageMaker (Smart Retries, Churn), couplés à Feast (Redis).
-* **Livrables :** 9 rapports techniques d'architecture au format PDF, schémas relationnels et dimensionnels (DBML et PNG), présentation de soutenance (`.pptx`).
-* **Accès :** [`02_BLOC_2_ARCHITECTURE_STRIPE/LIVRABLES/`](./02_BLOC_2_ARCHITECTURE_STRIPE/LIVRABLES/)
-
----
-
-## 3. Bloc 3 — Pipeline de Streaming & Détection de Fraude (Kafka)
-
-* **Objectif :** Déployer une chaîne complète de traitement de données temps réel et batch pour intercepter les transactions frauduleuses avant débit bancaire.
-* **Composants clés :**
-  * Ingestion streaming via cluster Apache Kafka en mode KRaft (3 partitions).
-  * Modèle de Machine Learning (`HistGradientBoostingClassifier`, Scikit-Learn) entraîné sur 555 719 transactions réelles (ROC-AUC : 0.986, inférence unitaire < 4 ms).
-  * API de scoring REST FastAPI conteneurisée (Docker).
-  * Résilience par Dead Letter Queue (`fraud-dlq`) pour l'isolation des messages corrompus.
-  * Double persistance : stockage colonne partitionné (Data Lake Parquet Snappy) et base relationnelle d'audit.
-  * Réconciliation quotidienne par batch ordonnancé via Apache Airflow.
-* **Livrables & Code :** Code source complet (`01_train`, `02_api`, `03_pipeline_streaming`, `04_batch_airflow`, `05_database`), rapport technique PDF, présentation PPTX/PDF, fiche de démonstration vidéo.
-* **Accès :** [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/)
-
----
-
-## 4. Bloc 4 — Industrialisation, Déploiement & MLOps (CliNER-MLOps)
-
-* **Objectif :** Industrialiser en environnement de production une solution d'IA médicale pour l'extraction d'entités cliniques (Clinical NER) avec monitoring continu et réentraînement automatisé.
-* **Dépôt GitHub de l'application & CI/CD :** 👉 **[https://github.com/Elkristobal59/cliner-mlops](https://github.com/Elkristobal59/cliner-mlops)**
-* **Composants clés :**
-  * Architecture bicéphale : Embedder figé (BioBERT) et LLM génératif fine-tuné par adaptateur LoRA (Qwen-7B / PEFT).
-  * Détection de dérive (Data & Concept Drift) basée sur la distance de Wasserstein sur les embeddings de protocoles cliniques récents.
-  * Déclenchement automatique de réentraînement sur instance GPU AWS EC2 (`g4dn.xlarge`) avec protocole FinOps d'auto-arrêt.
-  * Workflows CI/CD GitHub Actions (`ci_mlops.yml`, `deploy_frontend.yml`, `deploy_backend_aws.yml`) et Model Registry MLflow.
-* **Livrables de soutenance :** Support de présentation officiel (`.pdf` et `.pptx`) dans [`04_BLOC_4_MLOPS_CLINER/LIVRABLES/`](./04_BLOC_4_MLOPS_CLINER/LIVRABLES/).
-
----
-
-## Structure du Dépôt
-
-```text
-CERTIFICATION_AIA/
-├── 01_BLOC_1_GOUVERNANCE_SPOTIFY/
-│   ├── LIVRABLES/         # Dossier maître Word/PDF, politiques DMBOK, RACI, présentation PPTX
-│   └── README.md          # Synthèse du projet et cadre méthodologique
-├── 02_BLOC_2_ARCHITECTURE_STRIPE/
-│   ├── LIVRABLES/         # 9 rapports techniques PDF, présentation PPTX, modèles DBML/PNG
-│   └── README.md          # Synthèse d'architecture cloud et SLA de latence
-├── 03_BLOC_3_PIPELINE_FRAUD_DETECTION/
-│   ├── LIVRABLES/         # Rapport technique PDF, support PPTX/PDF, fiche démo vidéo
-│   ├── 01_train/          # Scripts et modèle de scoring entraîné
-│   ├── 02_api/            # Microservice FastAPI Dockerisé
-│   ├── 03_pipeline_streaming/ # Broker Kafka, Consumer, Alerting, DLQ
-│   ├── 04_batch_airflow/  # DAG d'audit matinal et réconciliation
-│   ├── 05_database/       # Gestionnaire de base de données relationnelle
-│   ├── run_full_pipeline_demo.py # Script d'exécution de la démonstration
-│   └── README.md          # Guide technique de reproduction pas à pas
-├── 04_BLOC_4_MLOPS_CLINER/
-│   ├── LIVRABLES/         # Support de présentation PPTX et PDF
-│   └── README.md          # Architecture MLOps et renvoi vers https://github.com/Elkristobal59/cliner-mlops
-└── README.md              # Ce document
-```
-
----
+👉 **Guide complet d'installation, architecture, Data Lineage, FinOps et commandes :** consulter [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/README.md`](03_BLOC_3_PIPELINE_FRAUD_DETECTION/README.md).

@@ -1,0 +1,197 @@
+services:
+  # 1. PostgreSQL Unifié (remplace SQLite — 100 % compatible Neon PostgreSQL)
+  postgres:
+    image: postgres:16
+    container_name: fraud-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fraud_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraud_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-fraud_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./05_database/init_postgres.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./05_database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fraud_user} -d ${POSTGRES_DB:-fraud_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 2. Stockage Objet S3-Compatible (MinIO local — API identique à AWS S3)
+  minio:
+    image: minio/minio:latest
+    container_name: fraud-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Initialisation automatique du bucket S3 'mlflow-artifacts' via boto3
+  minio-init:
+    image: elkristobal59/mlflow:latest
+    container_name: fraud-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
+    entrypoint:
+      - python
+      - -c
+      - |
+        import boto3, botocore
+        s3 = boto3.client("s3", endpoint_url="http://minio:9000")
+        for b in ["mlflow-artifacts", "fraud-datalake"]:
+            try:
+                s3.head_bucket(Bucket=b)
+            except botocore.exceptions.ClientError:
+                s3.create_bucket(Bucket=b)
+                print("Created bucket:", b)
+
+  # 3. Serveur MLflow Tracking & Model Registry (@champion / @challenger)
+  mlflow:
+    image: elkristobal59/mlflow:latest
+    container_name: fraud-mlflow-server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
+      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-}
+      MLFLOW_BACKEND_STORE_URI: ${MLFLOW_BACKEND_STORE_URI:-postgresql+psycopg2://${POSTGRES_USER:-fraud_user}:${POSTGRES_PASSWORD:-fraud_pass}@postgres:5432/mlflow_db}
+      MLFLOW_ARTIFACT_BUCKET: ${MLFLOW_ARTIFACT_BUCKET:-mlflow-artifacts}
+    ports:
+      - "5000:5000"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if [ -z "$MLFLOW_S3_ENDPOINT_URL" ]; then unset MLFLOW_S3_ENDPOINT_URL; fi
+        exec mlflow server \
+          --host 0.0.0.0 \
+          --port 5000 \
+          --backend-store-uri "$MLFLOW_BACKEND_STORE_URI" \
+          --default-artifact-root "s3://$MLFLOW_ARTIFACT_BUCKET/" \
+          --allowed-hosts "*"
+
+  # 4. Broker Apache Kafka en mode KRaft (sans ZooKeeper)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-fraud-broker
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-fraud-ui
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-fraud-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      - kafka
+
+  # 5. Serveur SMTP Mailpit (capture et UI Web locale des e-mails envoyés par smtplib)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: fraud-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  # 6. Microservice d'Inférence FastAPI (charge @champion depuis MLflow Registry)
+  fraud-scoring-api:
+    build:
+      context: .
+      dockerfile: 02_api/Dockerfile
+    container_name: fraud-scoring-api
+    depends_on:
+      - mlflow
+    ports:
+      - "8080:8080"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_MODEL_NAME: ${MLFLOW_MODEL_NAME:-fraud_detection_model}
+      MLFLOW_MODEL_ALIAS: ${MLFLOW_MODEL_ALIAS:-champion}
+      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
+    volumes:
+      - ./01_train:/app/01_train:ro
+
+  # 7. Apache Airflow (Orchestration Batch Quotidien & Réentraînement)
+  airflow:
+    build:
+      context: .
+      dockerfile: 04_batch_airflow/Dockerfile
+    container_name: fraud-airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    ports:
+      - "8088:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-fraud_user}:${POSTGRES_PASSWORD:-fraud_pass}@postgres:5432/airflow_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-fraud_user}:${POSTGRES_PASSWORD:-fraud_pass}@postgres:5432/fraud_db}
+      SECRET_SALT: ${SECRET_SALT:-change-me-local-dev-salt}
+      FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.45}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_MODEL_NAME: ${MLFLOW_MODEL_NAME:-fraud_detection_model}
+      MLFLOW_MODEL_ALIAS: ${MLFLOW_MODEL_ALIAS:-champion}
+      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
+      PYTHONPATH: /opt/project
+    volumes:
+      - ./04_batch_airflow:/opt/airflow/dags
+      - .:/opt/project
+    command: standalone
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,64 +1,66 @@
--- Schéma Opérationnel pour la Détection de Fraude (Bloc 3 - RNCP 41993)
--- Compatible SQLite & PostgreSQL (Aurora / RDS)
+-- Schéma PostgreSQL Opérationnel pour la Détection de Fraude (Bloc 3 - RNCP 41993)
+-- 100 % compatible PostgreSQL Docker local, Neon PostgreSQL et AWS RDS / Aurora
 
--- 1. Table principale de stockage des transactions enrichies
+-- 1. Transactions scorées (conformes PCI-DSS & RGPD : PAN masqué + nom pseudonymisé SHA-256 salé)
 CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     trans_num VARCHAR(64) UNIQUE NOT NULL,
-    cc_num VARCHAR(32),
-    merchant VARCHAR(128),
-    category VARCHAR(64),
-    amt DECIMAL(10, 2) NOT NULL,
-    customer_name VARCHAR(128),
+    cc_num VARCHAR(32) NOT NULL,
+    merchant VARCHAR(128) NOT NULL,
+    category VARCHAR(64) NOT NULL,
+    amt NUMERIC(12, 2) NOT NULL CHECK (amt >= 0),
+    customer_name VARCHAR(128) NOT NULL,
+    customer_pseudo_hash VARCHAR(64) NOT NULL,
     city VARCHAR(64),
     state VARCHAR(16),
     city_pop INTEGER,
-    distance_km DECIMAL(8, 2),
-    trans_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_fraud_predicted BOOLEAN NOT NULL DEFAULT 0,
-    fraud_probability DECIMAL(5, 4) NOT NULL,
+    distance_km NUMERIC(8, 2) NOT NULL DEFAULT 0,
+    trans_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_fraud_predicted BOOLEAN NOT NULL DEFAULT FALSE,
+    fraud_probability NUMERIC(6, 4) NOT NULL,
     risk_level VARCHAR(16) NOT NULL,
     decision VARCHAR(32) NOT NULL,
-    scored_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    model_version VARCHAR(64) DEFAULT 'champion',
+    scored_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_trans_time ON transactions(trans_time);
 CREATE INDEX IF NOT EXISTS idx_is_fraud ON transactions(is_fraud_predicted);
 CREATE INDEX IF NOT EXISTS idx_merchant ON transactions(merchant);
 
--- 2. Table des alertes de fraudes temps réel
+-- 2. Journal des alertes de fraude temps réel (Console + Log JSON + E-mail SMTP)
 CREATE TABLE IF NOT EXISTS fraud_alerts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    trans_num VARCHAR(64) NOT NULL,
-    amt DECIMAL(10, 2) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    trans_num VARCHAR(64) NOT NULL REFERENCES transactions(trans_num) ON DELETE CASCADE,
+    amt NUMERIC(12, 2) NOT NULL,
     merchant VARCHAR(128),
-    fraud_probability DECIMAL(5, 4) NOT NULL,
+    fraud_probability NUMERIC(6, 4) NOT NULL,
     risk_level VARCHAR(16) NOT NULL,
-    alert_channel VARCHAR(32) DEFAULT 'CONSOLE_AND_LOG',
-    alert_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (trans_num) REFERENCES transactions(trans_num)
+    alert_channel VARCHAR(64) NOT NULL DEFAULT 'SMTP_EMAIL_AND_LOG',
+    alert_sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Table des synthèses quotidiennes pour l'audit matinal (DAG Airflow)
+-- 3. Synthèses quotidiennes idempotentes pour l'audit matinal (DAG Apache Airflow)
 CREATE TABLE IF NOT EXISTS daily_audit_summary (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     audit_date DATE UNIQUE NOT NULL,
     total_transactions INTEGER NOT NULL,
-    total_volume_eur DECIMAL(14, 2) NOT NULL,
+    total_volume_eur NUMERIC(14, 2) NOT NULL,
     frauds_detected INTEGER NOT NULL,
-    fraud_volume_eur DECIMAL(14, 2) NOT NULL,
-    fraud_rate_pct DECIMAL(5, 2) NOT NULL,
+    fraud_volume_eur NUMERIC(14, 2) NOT NULL,
+    fraud_rate_pct NUMERIC(5, 2) NOT NULL,
     top_fraud_category VARCHAR(64),
-    audit_generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    dlq_rejected_count INTEGER NOT NULL DEFAULT 0,
+    data_drift_status VARCHAR(32) NOT NULL DEFAULT 'OK',
+    audit_generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Table Dead Letter Queue (DLQ) pour isoler les messages corrompus/invalides
+-- 4. Dead Letter Queue (DLQ) relationnelle pour tracer les rejets Pandera / Kafka
 CREATE TABLE IF NOT EXISTS dead_letter_queue (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     trans_num VARCHAR(64),
     raw_payload TEXT NOT NULL,
-    error_reason VARCHAR(255) NOT NULL,
-    source VARCHAR(64) DEFAULT 'KAFKA_STREAM',
-    received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    error_reason VARCHAR(512) NOT NULL,
+    source VARCHAR(64) NOT NULL DEFAULT 'KAFKA_STREAM',
+    received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-

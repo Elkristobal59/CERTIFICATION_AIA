@@ -1,0 +1,2 @@
+# Conserve le dossier data_lake/gold dans Git tout en ignorant les fichiers Parquet dynamiques
+

@@ -1,95 +1,84 @@
-# Architecture Technique & Industrialisation du Pipeline de Détection de Fraude en Temps Réel
+# 🛡️ RAPPORT D'ARCHITECTURE TECHNIQUE — PIPELINE DÉTECTION DE FRAUDE BANCAIRE (RNCP 41993 - BLOC 3)
 
-> **Projet :** Pipeline de Détection de Fraude en Temps Réel (Kafka & IA - RNCP 41993 Bloc 3)  
-> **Auteur :** Chris Gilleron  
-> **Dépôt Officiel :** [https://github.com/Elkristobal59/CERTIFICATION_AIA](https://github.com/Elkristobal59/CERTIFICATION_AIA)  
-> **Support de Présentation :** `ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx` (Slide 3 dédiée au schéma)  
-> **Schéma Graphique Officiel :** `schema_architecture_infrastructure_fraud.png`  
+*Architecture Hybride Docker Local (`Kafka KRaft`, `FastAPI`, `MLflow`, `Apache Airflow`) & Cloud Managé (`Neon PostgreSQL`, `AWS S3 eu-west-3`, `OpenLineage`)*
 
 ---
 
-## 1. Contexte Métier & Exigences Opérationnelles
+## 1. Contexte, Objectifs & Exigences Métier
 
-Dans le secteur bancaire et du paiement en ligne, la fraude aux cartes représente plus d'un milliard d'euros de pertes annuelles en Europe. La lutte contre ce risque nécessite la convergence de deux flux aux dynamiques opposées :
-1. **L'interception en temps réel (< 100 ms) :** Dès qu'un client effectue un paiement, la transaction doit être analysée à la volée par un modèle prédictif pour bloquer immédiatement les fraudes ou déclencher une vérification forte (3D-Secure).
-2. **L'audit consolidé quotidien (Batch) :** Chaque matin, la direction des risques et de la conformité doit disposer d'un état réconcilié de l'ensemble des transactions de la veille, incluant le monitoring de la dérive (Data Drift) et les indicateurs financiers.
+Dans le secteur des paiements électroniques, la validation d'une transaction doit intervenir en **moins de 100 ms** tout en assurant une gouvernance analytique quotidienne des flux, le respect strict des réglementations **PCI-DSS** et **RGPD**, et la tolérance aux pannes (données corrompues, pics de trafic).
 
----
-
-## 2. Architecture Globale du Pipeline (Modèle Jedha)
-
-Le pipeline repose sur une architecture événementielle découplée conforme au modèle d'infrastructure de référence enseigné chez Jedha, structuré en 5 modules fonctionnels interconnectés :
-
-![Schéma d'Architecture de l'Infrastructure](./schema_architecture_infrastructure_fraud.png)
-
-```
-[1. BUILD ALGORITHM]          [2. MLFLOW & SERVING]            [3. CONSUME DATA]
-fraudTest.csv (555k tx)       MLflow Model Registry            API HuggingFace Live
-        │                               │                                │
-        ▼                               ▼                                ▼
-Preprocess & Features    ───►  FastAPI Microservice (Docker) ──►  Apache Kafka KRaft (Topic)
-        │                      (Port 8080 - Scale-to-Zero)       (3 Partitions, Commit offsets)
-        ▼                               │                                │
-Scikit-Learn Model                      │ Inférence < 4ms                ▼
-(HistGradientBoosting)                  └───────────────────────► Consumer & Alerting
-                                                                  (BLOCK_IMMEDIATE / 3DS)
-                                                                         │
-                                                                         ├──► Dead Letter Queue (fraud-dlq)
-                                                                         │    (Isolation des rejets)
-                                                                         │
-                                                                         ▼ Persistance Synchrone
-                                                               [4. STORE DATA]
-                                                               Data Lake Bronze (Parquet Snappy)
-                                                               + Base SQL Opérationnelle (Audit)
-                                                                         │
-                                                                         ▼ Batch Quotidien (06h00 UTC)
-                                                               [5. LEVERAGE DATA]
-                                                               Apache Airflow DAG (Daily Audit)
-                                                               ➔ Rapport Matinal Quotidien Markdown
-```
+| Exigence Certification RNCP 41993 | Solution Déployée & Vérifiée |
+| :--- | :--- |
+| **Streaming Faible Latence (`C2`, `C3`)** | **Apache Kafka KRaft (`confluentinc/cp-kafka:7.5.0`)** + Producteur/Consommateur `confluent-kafka` + Microservice **FastAPI** (`19.4 ms` médiane, `28.9 ms` p95). |
+| **Gouvernance MLOps (`C1`, `C4`)** | Serveur **MLflow** dockerisé (backend **Neon `fraud_mlflow_db`** + artefacts réels **AWS S3 `eu-west-3`**), benchmark 3 modèles sur `555 719` transactions, alias **`@champion`** et **`@challenger`**. |
+| **Qualité des Données & Quarantaine (`C4`, `C5`)** | Schéma strict **Pandera `DataFrameSchema`** bloquant montants négatifs et anomalies GPS vers topic `fraud-dlq`, table **Neon `dead_letter_queue`** et zone Parquet `rejected/`. |
+| **Sécurité PCI-DSS & RGPD** | Masquage PAN `**** **** **** 1234`, hachage irréversible **SHA-256 salé** via `SECRET_SALT` (`.env`), suppression stricte des PII directs (`first`, `last`, `street`, `dob`, `job`, `zip`) en ETL Bronze → Silver et en DLQ. |
+| **Alerting & Réconciliation Batch (`C4`, `C5`)** | Envoi e-mail réel par **`smtplib`** (**Mailpit** local ou **Gmail TLS `587`**), persistance **Neon PostgreSQL (`fraud_db`)**, Data Lake Parquet Medallion, événements **OpenLineage** et DAG **Apache Airflow 2.11**. |
 
 ---
 
-## 3. Justifications des Choix Technologiques
+## 2. Schéma d'Architecture Déployée
 
-### A. Apache Kafka en mode KRaft (Kafka Raft Metadata)
-* **Pourquoi Kafka plutôt qu'Airflow pour le streaming ?** Kafka est conçu pour traiter des flux événementiels avec une latence inférieure à 30 ms. Airflow est un ordonnanceur de tâches par lots (batch) qui ne peut pas respecter un SLA sub-seconde.
-* **Pourquoi KRaft plutôt que Zookeeper ?** Depuis Kafka 3.3+, le consensus KRaft élimine la dépendance externe à Zookeeper, simplifie l'administration système, accélère le redémarrage des brokers et réduit l'empreinte mémoire de 25%.
-
-### B. Microservice d'Inférence FastAPI Conteneurisé
-* **Découplage strict :** Le modèle de Machine Learning est encapsulé dans une API REST conteneurisée (Docker), ce qui permet de faire évoluer le modèle indépendamment du moteur d'ingestion streaming.
-* **Performance :** L'inférence unitaire sur CPU s'exécute en **moins de 4 millisecondes**, garantissant le respect de la fenêtre de décision bancaire (< 100 ms).
-* **Déploiement Cloud Native :** Prêt pour Google Cloud Run ou Amazon ECS avec mise à l'échelle automatique (scaling à zéro lors des creux nocturnes).
-
-### C. Persistance Double : Data Lake Parquet & Base SQL
-* **Data Lake Parquet (Format Colonne) :** Chaque transaction brute est immédiatement sauvegardée dans un stockage objet partitionné (`data_lake/bronze/year=YYYY/month=MM/`). Le format Parquet compresse les données à hauteur de 75% et optimise les requêtes d'analyse rétrospective via le Column Pruning.
-* **Base SQL Opérationnelle :** Stocke les transactions scorées pour permettre les requêtes d'audit matinal et le suivi des alertes.
-
-### D. Résilience & Dead Letter Queue (DLQ)
-* En cas de message corrompu ou ne respectant pas le schéma attendu (ex: montant négatif de -150 €), le Consumer ne bloque pas le pipeline : le message est automatiquement routé vers le topic `fraud-dlq` pour inspection post-mortem.
+![Schéma Architecture Pipeline Fraude](../schema_architecture_infrastructure_fraud.png)
 
 ---
 
-## 4. Modèle Prédictif de Machine Learning
+## 3. Infrastructure Hybride (Docker Compose Local + Neon & AWS S3 Cloud)
 
-* **Algorithme :** `HistGradientBoostingClassifier` (Scikit-Learn).
-* **Données d'entraînement :** 555 719 transactions bancaires réelles (`fraudTest.csv`).
-* **Features calculées :**
-  1. `amt` : Montant de la transaction.
-  2. `distance_km` : Distance orthodromique calculée par la formule de Haversine entre l'acheteur et le commerçant.
-  3. `hour` : Heure de la transaction (capturant le risque accru entre 23h et 04h).
-  4. `age` : Âge du porteur de carte.
-  5. `city_pop` : Densité démographique de la commune.
-* **Performances validées :**
-  * **ROC-AUC :** 0.9866
-  * **Rappel Fraude :** 92.4 %
-  * **Temps de calcul :** < 3 ms par transaction
+L'architecture s'exécute via un orchestrateur unique [`docker-compose.yml`](../../docker-compose.yml) couplé à **Neon Serverless PostgreSQL** et **Amazon S3 (`eu-west-3`)** selon le pattern de déploiement hybride recommandé :
+
+1. **Neon PostgreSQL (Cloud Serverless SSL `eu-central-1`) :** Héberge les bases isolées **`fraud_db`** (tables `transactions`, `fraud_alerts`, `dead_letter_queue`, `daily_audit_summary`) et **`fraud_mlflow_db`** (expérimentations & Model Registry MLflow).
+2. **Amazon S3 (`eu-west-3` — bucket `fraud-bloc3-mlflow-rncp41993-chris`) :** Stockage objet réel des modèles MLflow et artefacts d'entraînement (`21` objets enregistrés pour les 3 versions). *(Un service `minio` reste présent en secours local hors-ligne.)*
+3. **`mlflow` (`elkristobal59/mlflow:latest`, port `5000`) :** Serveur MLflow local raccordé au backend **Neon `fraud_mlflow_db`** et au stockage objet **AWS S3**.
+4. **`kafka` (`confluentinc/cp-kafka:7.5.0`, port `9092`) + `kafka-ui` (port `8085`) :** Bus événementiel KRaft transportant `raw-transactions` et `fraud-dlq`.
+5. **`mailpit` (`axllent/mailpit:latest`, ports `1025` SMTP / `8025` Web UI) :** Serveur SMTP local par défaut en démonstration Docker (remplacé à chaud par **Gmail TLS `smtp.gmail.com:587`** via `.env`).
+6. **`fraud-scoring-api` (`02_api/Dockerfile`, port `8080`) :** API FastAPI + Pydantic v2 chargeant `models:/fraud_detection_model@champion` depuis MLflow + AWS S3 et rechargée à chaud via `POST /reload-model`.
+7. **`airflow` (`04_batch_airflow/Dockerfile` sur `apache/airflow:2.11.0`, port `8088`) :** Ordonnanceur LocalExecutor (métabase locale dédiée sur `postgres:5432/airflow_db`) pilotant le DAG matinal `daily_fraud_audit_pipeline` vers **Neon `fraud_db`**.
 
 ---
 
-## 5. Démonstration Opérationnelle & Déploiement
+## 4. Pipeline Machine Learning, Feature Engineering & Benchmark
 
-Le pipeline s'exécute de bout en bout en local ou dans le cloud via une suite de conteneurs Docker :
-* `docker compose -f 03_pipeline_streaming/docker-compose.kafka.yml up -d`
-* `docker run -d --name fraud-scoring-api -p 8080:8080 fraud-scoring-api:latest`
-* Lancement complet : `python run_full_pipeline_demo.py`
+Toutes les étapes d'entraînement, d'API temps réel et d'ETL Silver appellent une unique fonction partagée [`prepare_features()`](../../01_train/features.py) évitant tout *training-serving skew* :
+
+* **Variables extraites (`5 features`) :** `amt` (montant), `distance_km` (distance orthodromique de Haversine porteur–marchand), `city_pop` (densité urbaine), `hour` (heure UTC compatible ISO & epoch ms Hugging Face), `age` (âge calculé depuis `dob`).
+* **Prétraitement encapsulé :** Chaque modèle candidat utilise `sklearn.pipeline.Pipeline([("scaler", StandardScaler()), ("classifier", ...)])` garantissant l'absence de fuite de données sur le split stratifié 80/20 de `fraudTest.csv` (**555 719 transactions**, **2 145 fraudes = 0.39 %**).
+
+| Modèle Comparé (`01_train/train_model.py`) | Version MLflow | Alias | ROC-AUC | PR-AUC | Recall | Précision | F1-Score | Durée Fit |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **HistGradientBoosting_Balanced** (`max_iter=150`, `lr=0.08`, `max_depth=6`) | **v3** | **`@champion`** | **0.9876** | 0.6093 | **91.61 %** | 0.0833 | 0.1527 | 7.48 s |
+| **RandomForest_Balanced** (`n_estimators=80`, `max_depth=12`) | **v2** | **`@challenger`** | 0.9836 | **0.6156** | 82.0 % | **0.2051** | **0.3282** | 12.51 s |
+| **LogisticRegression_Balanced** (`max_iter=500`) | v1 | — | 0.8236 | 0.1418 | 74.1 % | 0.0589 | 0.1091 | 0.33 s |
+
+* **Arbitrage Métier :** En détection de fraude bancaire, le coût d'un faux négatif (fraude non détectée) dépasse largement celui d'une vérification 3-D Secure. `HistGradientBoosting_Balanced` est promu **`@champion`** grâce au meilleur **ROC-AUC (0.9876)** et un **Recall de 91.61 %**.
+* **Sérialisation & Latence vérifiées :** `fraud_model.joblib` pèse `357.0 Ko` en fallback local ; l'inférence HTTP mesurée sur 20 requêtes `/predict` (modèle chargé depuis **AWS S3**) obtient **15.5 ms min / 19.4 ms médiane / 28.9 ms p95 / 32.5 ms max** (bien sous le SLA `< 100 ms`).
+
+---
+
+## 5. Sécurité PCI-DSS / RGPD, Qualité Pandera & Data Lineage
+
+### 5.1 Barrières Cryptographiques & Privacy-by-Design
+* **Gestion des Secrets (`.env`) :** Aucun mot de passe, clé AWS IAM, URL Neon, mot de passe d'application Gmail ou `SECRET_SALT` n'est présent dans le code ni dans Git (`.env` exclu via `.gitignore`, seul `.env.example` est versionné).
+* **Masquage PAN PCI-DSS v4.0 :** `mask_credit_card()` convertit tout numéro de carte en `**** **** **** 1234` avant toute écriture Neon PostgreSQL, Parquet Bronze, log applicatif ou e-mail SMTP.
+* **Pseudonymisation & Minimisation RGPD :** `pseudonymize_name()` génère `D*** W*** (ID:64698E)` et un hash irréversible **SHA-256 salé** (`sha256(f"{SECRET_SALT}:{nom}")`). Lors de la transition Bronze → Silver (et avant toute écriture en DLQ via `_sanitize_payload_pii()`), les 7 attributs PII directs (`cc_num`, `first`, `last`, `street`, `dob`, `job`, `zip`) sont **supprimés physiquement**.
+
+### 5.2 Traçabilité Data Lineage & OpenLineage
+
+| Étape | Source | Transformation / Contrôle | Cible & Gouvernance |
+| :--- | :--- | :--- | :--- |
+| **1. Ingestion** | HF Live / CSV | Sérialisation JSON + `Producer.produce()` | Kafka `raw-transactions` |
+| **2. Quality Gate** | Kafka Stream | Validation Pandera `TRANSACTION_SCHEMA` (`amt >= 0`) | Flux valide ou `fraud-dlq` + `rejected/` |
+| **3. Inférence** | API FastAPI | `prepare_features()` + MLflow `@champion` (`AWS S3`) | HTTP `200` / rejet strict `422` Pydantic |
+| **4. Persistance** | Score modèle | Mask PAN `**** **** **** 1234` + SHA-256 + `smtplib` | Neon `fraud_db` + SMTP (`Mailpit`/`Gmail`) + Bronze Parquet |
+| **5. Medallion ETL** | `bronze/` | Contrôle batch + **DROP 7 PII** + dérive Gold | `silver/`, `gold/`, Neon `daily_audit_summary` |
+| **6. Traçabilité** | DAG Airflow | Exécution `06h00 UTC` (3 tâches séquentielles) | `data_lake/lineage/openlineage_events.jsonl` |
+
+---
+
+## 6. Gouvernance FinOps (AWS Pricing Calculator vs AWS Cost Explorer)
+
+L'architecture hybride active (**Docker local + Neon Free Tier + Amazon S3 `eu-west-3`**) reste quasiment gratuite (**< 0,10 €/mois** sur S3) tout en permettant une bascule complète des conteneurs compute vers AWS via `.env` :
+
+* **Phase Conception (`AWS Pricing Calculator` — région `eu-west-3` Paris) :** Simulation budgétaire cible pour un déploiement PME (~30 à 60 €/mois : App Runner ou EC2 `t3.small` ~15–20 €, RDS PostgreSQL `db.t4g.micro` ~13 € ou Neon Free Tier 0 €, S3 Standard avec cycle de vie Glacier pour Parquet < 1 €, AWS SES / Gmail).
+* **Phase Exploitation (`AWS Cost Explorer` & `AWS Budgets`) :** Attribution obligatoire des ressources par tags (`Project=FraudBloc3`, `Env=Prod`), suivi de dérive journalier des coûts compute/stockage et alertes automatiques à 80 % du budget prévisionnel.

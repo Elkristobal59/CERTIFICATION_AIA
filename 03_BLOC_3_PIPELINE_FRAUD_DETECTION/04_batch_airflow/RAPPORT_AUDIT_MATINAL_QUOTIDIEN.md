@@ -1,27 +1,16 @@
-# 📑 Rapport Quotidien d'Audit des Fraudes Bancaires
-> **Pipeline :** Batch Airflow Matinal (06h00 UTC)  
-> **Date de l'Audit :** 2026-10-28  
-> **Statut de l'Infrastructure :** 🟢 OPÉRATIONNELLE  
+# 🛡️ RAPPORT D'AUDIT MATINAL QUOTIDIEN — 2026-11-13
 
----
+*Généré automatiquement le 2026-11-13 00:04:23 — Pipeline Batch Airflow / PostgreSQL*
 
-## 🎯 1. Indicateurs Clés de Performance (KPIs 24h)
+| Indicateur | Valeur Mesurée |
+| :--- | :--- |
+| **Volume Transactions Analysées** | `3` |
+| **Volume Financier Traité** | `930.89 €` |
+| **Alertes Fraude Confirmées** | `1` (33.33 %) |
+| **Montant Fraude Bloquée / Monitorée** | `825.81 €` |
+| **Catégorie la Plus Ciblée** | `shopping_pos` |
+| **Rejets Pandera / DLQ (`rejected/`)** | `0` |
+| **Statut Data Drift (Gold)** | `OK` |
 
-| Indicateur Métier | Valeur 24h | Cumul Global |
-| :--- | :---: | :---: |
-| **Transactions Analysées** | **10** | 19 |
-| **Volume Financier Traité** | **1,787.25 €** | 4,138.41 € |
-| **Fraudes Détectées & Bloquées** | **4** | 4 |
-| **Montant Financier Sauvegardé** | **1,445.24 €** | 1,445.24 € |
-| **Taux de Fraude Moyen** | **40.00 %** | 21.05 % |
-| **Secteur le Plus Vulnérable** | **misc_net** | - |
-
----
-
-## 🛡️ 2. Conformité Réglementaire & Sécurité
-* **SLA de Détection :** Respecté (< 30 ms par transaction en streaming).
-* **Rétention des Logs :** Traçabilité immuable dans `05_database/fraud_pipeline.db` et logs d'alerte.
-* **Notifications :** 100% des cas frauduleux ont fait l'objet d'une alerte immédiate conforme au cahier des charges.
-
----
-*Rapport généré automatiquement pour la Direction des Risques et le DPO.*
+- **Stockage Data Lake Medallion** : `bronze/` -> `silver/` -> `gold/` & `rejected/`
+- **Traçabilité OpenLineage** : `data_lake\lineage\openlineage_events.jsonl`

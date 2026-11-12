@@ -11,7 +11,16 @@ fraudTest.csv
 *coaching*
 *transcript*
 coaching_segments.json
-mlflow.db
+
+# Bases de données locales, MLflow & Airflow (aucune donnée sensible sur Git)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+mlruns/
+.mlflow/
+mlartifacts/
+03_BLOC_3_PIPELINE_FRAUD_DETECTION/04_batch_airflow/logs/
 
 # Environnements virtuels et caches Python
 __pycache__/
@@ -22,16 +31,24 @@ env/
 venv/
 .pytest_cache/
 
-# Données dynamiques locales et Data Lake
+# Données dynamiques locales et Data Lake Medallion + Quarantaine
 **/data_lake/bronze/*
 !**/data_lake/bronze/.gitkeep
-*.db-journal
-mlruns/
-.mlflow/
+**/data_lake/silver/*
+!**/data_lake/silver/.gitkeep
+**/data_lake/gold/*
+!**/data_lake/gold/.gitkeep
+**/data_lake/rejected/*
+!**/data_lake/rejected/.gitkeep
+**/data_lake/lineage/*
+!**/data_lake/lineage/.gitkeep
+03_BLOC_3_PIPELINE_FRAUD_DETECTION/04_batch_airflow/audit_report_*.md
 
-# Fichiers système et secrets
+# Fichiers système, verrous Office et secrets
+~$*
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 *.log
