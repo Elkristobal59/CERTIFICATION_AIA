@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-// STRIPE AI INFRASTRUCTURE - OLTP & OLAP DATA MODEL (DBML)
+// STRIPE AI INFRASTRUCTURE - OLTP DATA MODEL (DBML)
 // Certification AIL - Bloc 2 (RNCP 41993)
 // Auteur: Lead AI Architect Stripe
 // Importable directement sur https://dbdiagram.io/home
@@ -15,7 +15,7 @@ Table Merchant {
   business_name varchar(150) [not null]
   legal_entity_type varchar(50) [note: 'corporation, individual, non_profit']
   mcc_code varchar(4) [not null, note: 'Merchant Category Code (ex: 5732 electronics, 5812 restaurants)']
-  country varchar(2) [not null, note: 'Code pays ISO-2 (résidence fiscale et conformité)']
+  country varchar(2) [ref: > CountryReference.country_code, not null, note: 'Code pays ISO-2 (résidence fiscale et conformité)']
   settlement_currency varchar(3) [not null, note: 'Devise de règlement par défaut (EUR, USD, GBP...)']
   payout_schedule varchar(20) [default: 'daily', note: 'daily, weekly, monthly']
   risk_level varchar(20) [default: 'standard', note: 'low, standard, elevated, restricted']
@@ -32,11 +32,12 @@ Table Customer {
   email_hash varchar(64) [not null, note: 'SHA-256 de l email pour pseudonymisation RGPD']
   country varchar(2) [note: 'Pays de facturation principal']
   risk_score float [default: 0.0, note: 'Score de réputation client agrégé [0.0 - 1.0]']
+  do_not_sell_or_share boolean [default: false, note: 'Consentement CCPA (opt-out partage analytique)']
   is_verified boolean [default: false]
   created_at timestamp [not null, default: `now()`]
   last_active_at timestamp
 
-  Note: 'Client final (acheteur). Conforme RGPD : données PII pseudonymisées'
+  Note: 'Client final (acheteur). Conforme RGPD & CCPA : données PII pseudonymisées'
 }
 
 Table PaymentMethod {
@@ -60,6 +61,8 @@ Table Transaction {
   merchant_id varchar(32) [ref: > Merchant.merchant_id, not null]
   customer_id varchar(32) [ref: > Customer.customer_id]
   payment_method_id varchar(32) [ref: > PaymentMethod.payment_method_id, not null]
+  subscription_id varchar(32) [ref: > Subscription.subscription_id, note: 'Optionnel : renseigné si renouvellement d abonnement']
+  exchange_rate_id varchar(40) [ref: > CurrencyExchangeRate.rate_id, note: 'Taux FX appliqué si conversion multi-devises']
   amount bigint [not null, note: 'Montant en centimes (évite erreurs d arrondis en virgule flottante)']
   currency varchar(3) [not null, note: 'Code devise ISO-4217 (EUR, USD, etc.)']
   stripe_fee bigint [not null, note: 'Commission Stripe perçue en centimes']
@@ -131,5 +134,61 @@ Table MerchantPayout {
   Note: 'Virements bancaires automatiques vers les comptes des marchands'
 }
 
-
 // ============================================================================
+// 2. GESTION DES ABONNEMENTS & DONNÉES DE RÉFÉRENCE (MASTER DATA)
+// ============================================================================
+
+Table ProductCatalog {
+  product_id varchar(32) [pk, note: 'ID produit ou forfait marchand (ex: prod_Q9x...)']
+  merchant_id varchar(32) [ref: > Merchant.merchant_id, not null]
+  product_name varchar(120) [not null]
+  category varchar(50) [not null, note: 'saas, ecommerce, digital_media, service']
+  unit_price_cents bigint [not null, note: 'Prix unitaire catalogue en centimes']
+  currency varchar(3) [not null]
+  billing_type varchar(20) [not null, note: 'one_time, recurring']
+  is_active boolean [default: true]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Donnée de référence : Catalogue produits et plans tarifaires marchands'
+}
+
+Table Subscription {
+  subscription_id varchar(32) [pk, note: 'ID abonnement récurrent (ex: sub_5K8w...)']
+  merchant_id varchar(32) [ref: > Merchant.merchant_id, not null]
+  customer_id varchar(32) [ref: > Customer.customer_id, not null]
+  product_id varchar(32) [ref: > ProductCatalog.product_id, not null]
+  payment_method_id varchar(32) [ref: > PaymentMethod.payment_method_id, not null]
+  status varchar(25) [not null, note: 'trialing, active, past_due, canceled, unpaid']
+  billing_cycle varchar(20) [not null, note: 'monthly, quarterly, yearly']
+  current_period_start timestamp [not null]
+  current_period_end timestamp [not null]
+  retry_attempt_count int [default: 0, note: 'Nb de relances Smart Retries en cours']
+  cancel_at_period_end boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Gestion des abonnements et facturation récurrente (Smart Retries)'
+}
+
+Table CountryReference {
+  country_code varchar(2) [pk, note: 'Code ISO 3166-1 alpha-2 (FR, US, DE, JP...)']
+  country_name varchar(100) [not null]
+  region_code varchar(30) [not null, note: 'EMEA, NAMER, APAC, LATAM']
+  regulatory_zone varchar(30) [not null, note: 'RGPD_EEA, CCPA_US, UK_GDPR, OTHER']
+  default_currency varchar(3) [not null]
+  is_sepa_zone boolean [default: false]
+  sanction_risk_tier varchar(20) [default: 'low', note: 'low, medium, high, embargoed']
+
+  Note: 'Donnée de référence : Pays, régions réglementaires et zones monétaires'
+}
+
+Table CurrencyExchangeRate {
+  rate_id varchar(40) [pk, note: 'ID taux horodaté (ex: fx_EUR_USD_20261112)']
+  base_currency varchar(3) [not null, note: 'Devise source ISO-4217']
+  target_currency varchar(3) [not null, note: 'Devise cible ISO-4217']
+  exchange_rate numeric(14,6) [not null, note: 'Taux interbancaire de conversion']
+  effective_from timestamp [not null]
+  effective_to timestamp
+  source_provider varchar(40) [default: 'ECB_FIXING']
+
+  Note: 'Donnée de référence : Historique horodaté des taux de change multi-devises'
+}

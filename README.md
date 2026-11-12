@@ -34,11 +34,11 @@ Ce dépôt centralise les travaux d'ingénierie, architectures, codes sources et
 
 * **Objectif :** Concevoir une architecture cloud souveraine sur AWS (Région Paris `eu-west-3`) pour l'évaluation du risque de transaction en temps réel avec un SLA inférieur à 100 ms.
 * **Composants clés :**
-  * Cœur transactionnel OLTP en 3e Forme Normale (Aurora PostgreSQL, réplication Multi-AZ).
-  * Isolation bancaire conforme PCI-DSS Level 1 (Card Vault CloudHSM, chiffrement AES-256 CMK).
-  * Streaming asynchrone via Debezium CDC et Kafka MSK pour découpler la production de l'analytique.
-  * Entrepôt décisionnel Redshift Serverless modélisé en Schéma en Étoile (3 faits, 6 dimensions).
-  * Inférence d'IA sous 30 ms via FastAPI et ONNX Runtime sur CPU optimisés (c6i), couplé au Feature Store Feast (Redis).
+  * Cœur transactionnel OLTP en 3e Forme Normale (12 tables : paiements, abonnements, litiges, référentiels sur Aurora PostgreSQL Multi-AZ).
+  * Isolation bancaire & conformité PCI-DSS Level 1, RGPD et CCPA (Card Vault CloudHSM, chiffrement AES-256 CMK, gestion *Opt-Out*).
+  * Stockage NoSQL polyglotte (Amazon DocumentDB : JSON, XML ISO 20022/SEPA, retours NLP, vecteurs SHAP) & streaming Debezium CDC, Kafka MSK et Kinesis Firehose.
+  * Entrepôt décisionnel Redshift Serverless modélisé en Schéma en Étoile (4 tables de faits, 1 synthèse produit et 7 dimensions).
+  * Inférence d'IA sous 30 ms via FastAPI/ONNX Runtime (Radar Fraude, Adaptive Checkout) & modèles batch SageMaker (Smart Retries, Churn), couplés à Feast (Redis).
 * **Livrables :** 9 rapports techniques d'architecture au format PDF, schémas relationnels et dimensionnels (DBML et PNG), présentation de soutenance (`.pptx`).
 * **Accès :** [`02_BLOC_2_ARCHITECTURE_STRIPE/LIVRABLES/`](./02_BLOC_2_ARCHITECTURE_STRIPE/LIVRABLES/)
 

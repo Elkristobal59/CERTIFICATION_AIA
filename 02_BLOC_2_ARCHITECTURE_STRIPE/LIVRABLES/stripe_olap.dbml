@@ -29,10 +29,25 @@ Table DimCustomer {
   merchant_id varchar(32) [not null]
   country varchar(2)
   risk_segment varchar(20) [note: 'VIP, Standard, HighRisk, Dormant']
+  rfm_tier varchar(20) [note: 'Champions, Loyal, AtRisk, Churned']
+  do_not_sell_or_share boolean [default: false, note: 'Opt-out CCPA respecté en BI']
   account_age_days int
   created_year int
 
-  Note: 'Dimension Client (analyse de cohorte et segmentation comportementale)'
+  Note: 'Dimension Client (segmentation RFM, cohorte et profil de risque)'
+}
+
+Table DimProduct {
+  product_key int [pk, increment, note: 'Surrogate Key produit']
+  product_id varchar(32) [not null]
+  merchant_id varchar(32) [not null]
+  product_name varchar(120) [not null]
+  category varchar(50) [note: 'saas, ecommerce, digital_media, service']
+  billing_type varchar(20) [note: 'one_time, recurring']
+  unit_price_cents bigint
+  is_active boolean
+
+  Note: 'Dimension Produit pour le suivi de performance des offres et abonnements'
 }
 
 Table DimDate {
@@ -68,10 +83,11 @@ Table DimGeoLocation {
   country_code varchar(2) [not null]
   region varchar(100)
   city varchar(100)
+  regulatory_zone varchar(30) [note: 'RGPD_EEA, CCPA_US, OTHER']
   is_high_risk_country boolean [default: false]
   is_datacenter_or_vpn boolean [default: false]
 
-  Note: 'Dimension Géographie pour détection de clusters de cybercriminalité'
+  Note: 'Dimension Géographie pour détection de clusters de cybercriminalité et conformité'
 }
 
 Table DimStatus {
@@ -85,7 +101,7 @@ Table DimStatus {
 }
 
 // ----------------------------------------------------------------------------
-// TABLES DE FAITS
+// TABLES DE FAITS & SYNTHÈSES PRÉ-AGRÉGÉES
 // ----------------------------------------------------------------------------
 
 Table FactTransactions {
@@ -93,6 +109,7 @@ Table FactTransactions {
   date_key int [ref: > DimDate.date_key, not null]
   merchant_key int [ref: > DimMerchant.merchant_key, not null]
   customer_key int [ref: > DimCustomer.customer_key]
+  product_key int [ref: > DimProduct.product_key]
   payment_method_key int [ref: > DimPaymentMethod.payment_method_key, not null]
   geo_key int [ref: > DimGeoLocation.geo_key, not null]
   status_key int [ref: > DimStatus.status_key, not null]
@@ -104,6 +121,7 @@ Table FactTransactions {
   net_merchant_amount_cents bigint [not null]
   refunded_amount_cents bigint [default: 0]
   is_disputed int [default: 0, note: '1 si litige ultérieur, 0 sinon']
+  is_recurring int [default: 0, note: '1 si encaissement sur abonnement']
   fraud_score float [note: 'Score de fraude Radar calculé [0-100]']
   inference_latency_ms float [note: 'Temps de réponse du microservice d inférence']
   transaction_count int [default: 1, note: 'Facilite les COUNT() additifs']
@@ -142,4 +160,33 @@ Table FactFraudAlerts {
   is_false_positive int [default: 0, note: '1 si débloqué par le marchand après réclamation']
 
   Note: 'Table de faits d audit de sécurité et de performance de l IA Radar'
+}
+
+Table FactComplianceAudits {
+  fact_audit_key bigint [pk, increment]
+  date_key int [ref: > DimDate.date_key, not null]
+  merchant_key int [ref: > DimMerchant.merchant_key]
+  geo_key int [ref: > DimGeoLocation.geo_key]
+
+  regulation_framework varchar(20) [not null, note: 'RGPD, PCI_DSS, CCPA']
+  event_type varchar(40) [not null, note: 'ERASURE_REQUEST, OPT_OUT, KEY_ROTATION, ACCESS_AUDIT']
+  records_affected int [not null, default: 1]
+  resolution_sla_hours float [not null, note: 'Temps de traitement effectif en heures']
+  compliance_status varchar(20) [not null, note: 'COMPLIANT, BREACH_BLOCKED, REMEDIATED']
+
+  Note: 'Table de faits conformité et audit réglementaire automatisé'
+}
+
+Table AggMonthlyProductPerformance {
+  agg_monthly_key bigint [pk, increment]
+  year_month int [not null, note: 'Format AAAAMM (ex: 202611)']
+  merchant_key int [ref: > DimMerchant.merchant_key, not null]
+  product_key int [ref: > DimProduct.product_key, not null]
+
+  monthly_gpv_cents bigint [not null]
+  active_subscriptions_count int [not null]
+  renewal_success_rate_pct float [not null]
+  churn_rate_pct float [not null]
+
+  Note: 'Table de synthèse mensuelle / Vue Matérialisée pour BI Produit (< 200 ms)'
 }
