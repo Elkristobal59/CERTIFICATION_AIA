@@ -30,6 +30,7 @@ init_db = db_mod.init_db
 insert_dlq = db_mod.insert_dlq
 insert_transaction = db_mod.insert_transaction
 mask_credit_card = db_mod.mask_credit_card
+sanitize_payload_pii = db_mod._sanitize_payload_pii
 
 
 class FraudConsumer:
@@ -68,9 +69,7 @@ class FraudConsumer:
             self.consumer.subscribe([self.topic])
 
     def _send_to_dlq(self, raw_payload: Any, reason: str) -> None:
-        sanitized = dict(raw_payload) if isinstance(raw_payload, dict) else {"raw": str(raw_payload)}
-        if "cc_num" in sanitized:
-            sanitized["cc_num"] = mask_credit_card(sanitized.get("cc_num"))
+        sanitized = sanitize_payload_pii(raw_payload) if isinstance(raw_payload, dict) else {"raw": str(raw_payload)}
         dlq_event = {
             "error_reason": reason,
             "payload": sanitized,

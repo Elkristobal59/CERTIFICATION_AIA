@@ -149,6 +149,7 @@ services:
       MLFLOW_MODEL_NAME: ${MLFLOW_MODEL_NAME:-fraud_detection_model}
       MLFLOW_MODEL_ALIAS: ${MLFLOW_MODEL_ALIAS:-champion}
       MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-}
+      FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.50}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
@@ -178,7 +179,7 @@ services:
       _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-fraud_user}:${POSTGRES_PASSWORD:-fraud_pass}@postgres:5432/fraud_db}
       SECRET_SALT: ${SECRET_SALT:-change-me-local-dev-salt}
-      FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.45}
+      FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.50}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_MODEL_NAME: ${MLFLOW_MODEL_NAME:-fraud_detection_model}
       MLFLOW_MODEL_ALIAS: ${MLFLOW_MODEL_ALIAS:-champion}

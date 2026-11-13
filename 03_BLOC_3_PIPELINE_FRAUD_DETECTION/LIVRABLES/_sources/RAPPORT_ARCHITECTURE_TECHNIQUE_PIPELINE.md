@@ -13,7 +13,7 @@ Dans le secteur des paiements électroniques, la validation d'une transaction do
 | **Streaming Faible Latence (`C2`, `C3`)** | **Apache Kafka KRaft (`confluentinc/cp-kafka:7.5.0`)** + Producteur/Consommateur `confluent-kafka` + Microservice **FastAPI** (`19.4 ms` médiane, `28.9 ms` p95). |
 | **Gouvernance MLOps (`C1`, `C4`)** | Serveur **MLflow** dockerisé (backend **Neon `fraud_mlflow_db`** + artefacts réels **AWS S3 `eu-west-3`**), benchmark 3 modèles sur `555 719` transactions, alias **`@champion`** et **`@challenger`**. |
 | **Qualité des Données & Quarantaine (`C4`, `C5`)** | Schéma strict **Pandera `DataFrameSchema`** bloquant montants négatifs et anomalies GPS vers topic `fraud-dlq`, table **Neon `dead_letter_queue`** et zone Parquet `rejected/`. |
-| **Sécurité PCI-DSS & RGPD** | Masquage PAN `**** **** **** 1234`, hachage irréversible **SHA-256 salé** via `SECRET_SALT` (`.env`), suppression stricte des PII directs (`first`, `last`, `street`, `dob`, `job`, `zip`) en ETL Bronze → Silver et en DLQ. |
+| **Sécurité PCI-DSS & RGPD** | Masquage PAN `**** **** **** 1234`, hachage irréversible **SHA-256 salé** via `SECRET_SALT` (`.env`), suppression stricte des PII directs (`first`, `last`, `street`, `dob`, `job`, `zip`) en ETL Bronze → Silver, dans le topic Kafka `fraud-dlq` (`_sanitize_payload_pii()`) et en zone `rejected/`. |
 | **Alerting & Réconciliation Batch (`C4`, `C5`)** | Envoi e-mail réel par **`smtplib`** (**Mailpit** local ou **Gmail TLS `587`**), persistance **Neon PostgreSQL (`fraud_db`)**, Data Lake Parquet Medallion, événements **OpenLineage** et DAG **Apache Airflow 2.11**. |
 
 ---
@@ -48,8 +48,8 @@ Toutes les étapes d'entraînement, d'API temps réel et d'ETL Silver appellent 
 | Modèle Comparé (`01_train/train_model.py`) | Version MLflow | Alias | ROC-AUC | PR-AUC | Recall | Précision | F1-Score | Durée Fit |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **HistGradientBoosting_Balanced** (`max_iter=150`, `lr=0.08`, `max_depth=6`) | **v3** | **`@champion`** | **0.9876** | 0.6093 | **91.61 %** | 0.0833 | 0.1527 | 7.48 s |
-| **RandomForest_Balanced** (`n_estimators=80`, `max_depth=12`) | **v2** | **`@challenger`** | 0.9836 | **0.6156** | 82.0 % | **0.2051** | **0.3282** | 12.51 s |
-| **LogisticRegression_Balanced** (`max_iter=500`) | v1 | — | 0.8236 | 0.1418 | 74.1 % | 0.0589 | 0.1091 | 0.33 s |
+| **RandomForest_Balanced** (`n_estimators=80`, `max_depth=12`) | **v2** | **`@challenger`** | 0.9836 | **0.6156** | 82.05 % | **0.2051** | **0.3282** | 12.51 s |
+| **LogisticRegression_Balanced** (`max_iter=500`) | v1 | — | 0.8236 | 0.1418 | 74.13 % | 0.0589 | 0.1091 | 0.33 s |
 
 * **Arbitrage Métier :** En détection de fraude bancaire, le coût d'un faux négatif (fraude non détectée) dépasse largement celui d'une vérification 3-D Secure. `HistGradientBoosting_Balanced` est promu **`@champion`** grâce au meilleur **ROC-AUC (0.9876)** et un **Recall de 91.61 %**.
 * **Sérialisation & Latence vérifiées :** `fraud_model.joblib` pèse `357.0 Ko` en fallback local ; l'inférence HTTP mesurée sur 20 requêtes `/predict` (modèle chargé depuis **AWS S3**) obtient **15.5 ms min / 19.4 ms médiane / 28.9 ms p95 / 32.5 ms max** (bien sous le SLA `< 100 ms`).

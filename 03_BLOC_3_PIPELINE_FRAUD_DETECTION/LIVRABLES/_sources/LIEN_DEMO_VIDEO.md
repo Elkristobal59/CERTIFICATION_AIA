@@ -6,9 +6,9 @@
 
 ## 1. Livrable Vidéo & État Actuel
 
-* **Fichier vidéo présent dans `LIVRABLES/` :** `fraud_detectionApp_chris_gilleron.mp4` (`123.1 Mo`, capture originale).
-* **Mise à niveau de l'infrastructure :** Depuis la capture initiale, le pipeline a été aligné sur les exigences complètes Session 3 + RNCP 41993 : serveur **MLflow + Neon PostgreSQL (`fraud_mlflow_db`) + AWS S3 (`eu-west-3`, `fraud-bloc3-mlflow-rncp41993-chris`)** avec alias `@champion` / `@challenger`, base opérationnelle **Neon PostgreSQL (`fraud_db`)**, validation **Pandera + zone `rejected/`**, masquage PAN `**** **** **** 1234` + **SHA-256 salé**, alerting **e-mail SMTP réel (`Mailpit` / `Gmail TLS`)** et DAG **Apache Airflow 2.11** vérifié en conteneur.
-* *Note de soutenance :* Utiliser le script minuté ci-dessous si vous souhaitez enregistrer une nouvelle capture de 2 min 30 s montrant les interfaces web `MLflow`, `AWS S3` / `Neon`, `Mailpit`, `Kafka UI` et `Airflow` actives.
+* **Fichier vidéo présent dans `LIVRABLES/` :** `fraud_detectionApp_chris_gilleron.mp4` (`123.1 Mo`, capture originale ; mise à jour vidéo planifiée post-refonte).
+* **Mise à niveau de l'infrastructure :** Depuis la capture initiale, le pipeline a été aligné sur les exigences complètes Session 3 + RNCP 41993 : serveur **MLflow + Neon PostgreSQL (`fraud_mlflow_db`) + AWS S3 (`eu-west-3`, `fraud-bloc3-mlflow-rncp41993-chris`)** avec alias `@champion` / `@challenger`, base opérationnelle **Neon PostgreSQL (`fraud_db`)**, validation **Pandera + quarantaine `fraud-dlq` / `rejected/` anonymisée**, masquage PAN `**** **** **** 1234` + **SHA-256 salé**, alerting **e-mail SMTP réel (`Mailpit` / `Gmail TLS`)** et DAG **Apache Airflow 2.11** vérifié en conteneur.
+* **Déroulé opérationnel couvert :** La séquence ci-dessous décrit les étapes de démonstration de bout en bout sur les interfaces web `MLflow`, `AWS S3` / `Neon`, `Mailpit` / `Gmail`, `Kafka UI` et `Airflow`.
 
 ---
 

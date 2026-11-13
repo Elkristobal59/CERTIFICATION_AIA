@@ -13,9 +13,9 @@ Le code source complet de la solution d'IA médicale, les conteneurs Docker et l
 
 Ce dépôt comprend notamment :
 * **Workflows CI/CD GitHub Actions :**
-  * `ci_mlops.yml` : Validation de la qualité de code (Flake8), tests unitaires (Pytest) et construction des images Docker.
-  * `deploy_frontend.yml` : Déploiement continu de l'interface Streamlit sur Render.
-  * `deploy_backend_aws.yml` : Orchestration du déploiement de l'API d'inférence vLLM sur AWS EC2 GPU.
+  * `ci_mlops.yml` : Validation de la qualité de code (Flake8), 11 tests unitaires/intégration (PyTest), simulation Continuous Training LoRA sur MLflow et construction des images Docker (`cliner-frontend`, `cliner-mlops-worker`).
+  * `weekly_mlops_pipeline.yml` : Cron hebdomadaire (Lundi 02h00 UTC) mesurant la dérive Wasserstein + rapport Evidently AI et déclenchant le réentraînement LoRA si $W > 0.08$.
+  * `deploy_ec2_autokill.yml` : Déclenchement manuel à la demande de l'instance AWS EC2 GPU avec minuteur et Auto-Kill FinOps garanti (`if: always()`).
 * **Architecture applicative :**
   * Frontend Streamlit conteneurisé.
   * Backend d'inférence LoRA optimisé vLLM.

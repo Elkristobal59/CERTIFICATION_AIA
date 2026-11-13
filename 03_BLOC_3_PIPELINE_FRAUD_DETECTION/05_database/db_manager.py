@@ -270,9 +270,10 @@ def insert_transaction(tx: Dict[str, Any], score_result: Dict[str, Any], alert_c
         )"""
     )
 
+    fraud_threshold = float(os.getenv("FRAUD_THRESHOLD", "0.50"))
     with get_engine().begin() as conn:
         conn.execute(text(upsert_sql), params)
-        if is_fraud_bool or prob >= 0.50:
+        if is_fraud_bool or prob >= fraud_threshold:
             conn.execute(
                 text("""INSERT INTO fraud_alerts (trans_num, amt, merchant, fraud_probability, risk_level, alert_channel)
                         VALUES (:trans_num, :amt, :merchant, :fraud_probability, :risk_level, :alert_channel)"""),

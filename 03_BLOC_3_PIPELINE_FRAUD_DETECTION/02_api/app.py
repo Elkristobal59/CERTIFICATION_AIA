@@ -110,11 +110,14 @@ class PredictionResponse(BaseModel):
     latency_ms: float
 
 
+FRAUD_THRESHOLD = float(os.getenv("FRAUD_THRESHOLD", "0.50"))
+
+
 def classify_risk(prob: float) -> tuple[bool, str, str]:
-    is_fraud = prob >= 0.50
+    is_fraud = prob >= FRAUD_THRESHOLD
     if prob >= 0.75:
         return is_fraud, "CRITICAL", "BLOCK_IMMEDIATE"
-    if prob >= 0.50:
+    if prob >= FRAUD_THRESHOLD:
         return is_fraud, "HIGH", "CHALLENGE_3DS"
     if prob >= 0.25:
         return is_fraud, "MEDIUM", "ALLOW_WITH_MONITORING"
