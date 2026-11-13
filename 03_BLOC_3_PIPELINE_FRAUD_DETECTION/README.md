@@ -4,6 +4,8 @@
 
 Architecture hybride **Streaming Temps Réel (`confluent-kafka` + FastAPI)** et **Orchestration Batch Medallion (`Apache Airflow 2.11` + `Apache Parquet`)**, alignée sur la **topologie Cloud/Locale Session 3** : services compute/streaming en **Docker local**, bases opérationnelles & MLOps sur **Neon PostgreSQL (`fraud_db`, `fraud_mlflow_db`)**, artefacts modèles sur **AWS S3 (`eu-west-3`, bucket `fraud-bloc3-mlflow-rncp41993-chris`)**, contrôle qualité **Pandera Data Quality Gate**, conformité **PCI-DSS / RGPD** et traçabilité **OpenLineage**.
 
+* **🎥 Démonstration vidéo complète (3 min 54 s — Google Drive) :** https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing
+
 ---
 
 ## 🎯 Objectifs & Conformité Référentiel (RNCP 41993 - Bloc 3)
@@ -131,5 +133,5 @@ docker exec fraud-airflow airflow dags test daily_fraud_audit_pipeline 2026-11-1
 * `schema_architecture_infrastructure_fraud.png` — Schéma d'architecture complet Streaming, MLflow S3, Medallion & Airflow
 * `ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx` & `.pdf` — Support de soutenance orale (5 min pitch)
 * `RAPPORT_ARCHITECTURE_TECHNIQUE_PIPELINE.pdf` — Dossier d'architecture technique, sécurité, Data Lineage & FinOps
-* `LIEN_DEMO_VIDEO.pdf` & `demo fraud detection christopher gilleron.mp4` — Guide et démonstration vidéo complète ([Google Drive public](https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing))
+* `LIEN_DEMO_VIDEO.pdf` & `demo fraud detection christopher gilleron.mp4` — Guide et démonstration vidéo complète : https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing
 * `Fraud_Detection_Livrables_Bloc3.zip` — Archive consolidée prête pour dépôt certification RNCP 41993

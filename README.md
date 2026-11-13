@@ -55,6 +55,7 @@ Ce dépôt centralise les travaux d'ingénierie, architectures, codes sources et
   * **Sécurité PCI-DSS v4.0, RGPD Privacy-by-Design & Alerting SMTP (C4) :** Masquage PAN systématique au format **`**** **** **** 1234`**, pseudonymisation irréversible **SHA-256 salé** (`SECRET_SALT` injecté par `.env`), notification e-mail temps réel via `smtplib` dès `FRAUD_THRESHOLD = 0.50` (`BLOCK_IMMEDIATE` à `>= 0.75`) et persistance dans **Neon PostgreSQL (`fraud_db`)**.
   * **Data Lake Medallion & Orchestration Batch Apache Airflow 2.11 (C3, C5) :** Stockage Parquet Snappy partitionné `year=/month=/day=` (`bronze/`, `silver/` expurgé des 7 colonnes PII directes, `gold/`, `rejected/`), DAG matinal **`daily_fraud_audit_pipeline`** (06h00 UTC, 3 tâches validées en conteneur) et traçabilité bout-en-bout **OpenLineage v1** (`openlineage_events.jsonl`).
 * **Livrables & Code :** Code source complet (`01_train/`, `02_api/`, `03_pipeline_streaming/`, `04_batch_airflow/`, `05_database/`, `docker-compose.yml`), schéma d'architecture PNG, rapport d'architecture PDF, présentation de soutenance (7 slides `.pptx` / `.pdf`) et guide de démonstration vidéo PDF.
+* **Démo vidéo publique (3 min 54 s — Google Drive) :** https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing
 * **Accès :** [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/) (guide complet : [`03_BLOC_3_PIPELINE_FRAUD_DETECTION/README.md`](./03_BLOC_3_PIPELINE_FRAUD_DETECTION/README.md))
 
 ---
