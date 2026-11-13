@@ -131,5 +131,5 @@ docker exec fraud-airflow airflow dags test daily_fraud_audit_pipeline 2026-11-1
 * `schema_architecture_infrastructure_fraud.png` — Schéma d'architecture complet Streaming, MLflow S3, Medallion & Airflow
 * `ARCHITECTURE_PIPELINE_FRAUD_BLOC3.pptx` & `.pdf` — Support de soutenance orale (5 min pitch)
 * `RAPPORT_ARCHITECTURE_TECHNIQUE_PIPELINE.pdf` — Dossier d'architecture technique, sécurité, Data Lineage & FinOps
-* `LIEN_DEMO_VIDEO.pdf` & `fraud_detectionApp_chris_gilleron.mp4` — Guide et capture de démonstration en fonctionnement
+* `LIEN_DEMO_VIDEO.pdf` & `demo fraud detection christopher gilleron.mp4` — Guide et démonstration vidéo complète ([Google Drive public](https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing))
 * `Fraud_Detection_Livrables_Bloc3.zip` — Archive consolidée prête pour dépôt certification RNCP 41993
