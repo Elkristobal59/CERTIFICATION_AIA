@@ -41,8 +41,8 @@ Benchmark réalisé sur l'intégralité du jeu de données (`555 719` transactio
 | Modèle (`Pipeline`) | Version MLflow | Alias | ROC-AUC | PR-AUC | Recall | Précision | F1-Score | Temps Fit |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **HistGradientBoostingClassifier** (`balanced`) | **v3** | **`@champion`** | **0.9876** | 0.6093 | **91.61 %** | 0.0833 | 0.1527 | 7.48 s |
-| **RandomForestClassifier** (`balanced`) | **v2** | **`@challenger`** | 0.9836 | **0.6156** | 82.0 % | **0.2051** | **0.3282** | 12.51 s |
-| **LogisticRegression** (`balanced`) | v1 | — | 0.8236 | 0.1418 | 74.1 % | 0.0589 | 0.1091 | 0.33 s |
+| **RandomForestClassifier** (`balanced`) | **v2** | **`@challenger`** | 0.9836 | **0.6156** | 82.05 % | **0.2051** | **0.3282** | 12.51 s |
+| **LogisticRegression** (`balanced`) | v1 | — | 0.8236 | 0.1418 | 74.13 % | 0.0589 | 0.1091 | 0.33 s |
 
 * **Taille de l'artefact sérialisé de secours (`01_train/fraud_model.joblib`) :** `357.0 Ko`
 * **Latence HTTP mesurée sur `POST http://localhost:8080/predict` (20 requêtes après préchauffe, modèle chargé depuis MLflow + AWS S3) :**

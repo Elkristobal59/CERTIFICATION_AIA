@@ -17,7 +17,7 @@ Spotify opère dans un environnement distribué caractérisé par une forte auto
 
 Le projet s'appuie sur le référentiel international **DAMA-DMBOK2** et le modèle de maturité **Gartner** :
 
-1. **Audit de maturité initiale (Score : 1.8 / 5) :** Identification des lacunes critiques sur la qualité des données, la sécurité et la traçabilité des métadonnées.
+1. **Audit de maturité initiale (Niveau global : 2 / 5 — Moyenne 2,2 / 5 sur les 10 dimensions DMBOK) :** Identification des lacunes critiques sur la qualité des données, la sécurité et la traçabilité des métadonnées.
 2. **Organisation cible en CoE Hybride (Hub & Spoke) :**
    * **Hub central (Gouvernance d'Entreprise) :** Sous l'autorité du Chief Data Officer (CDO), définit les standards, les politiques globales et administre le catalogue de données.
    * **Spokes distribués (Tribes produit) :** Chaque domaine dispose d'un **Data Owner** (décideur métier responsable légalement de son périmètre) et d'un **Data Steward** (garant opérationnel de la qualité et du glossaire sémantique).
