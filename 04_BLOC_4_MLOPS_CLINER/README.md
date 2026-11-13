@@ -49,6 +49,11 @@ Ce dépôt comprend notamment :
 | :--- | :---: | :--- |
 | `PRESENTATION_cliner-mlops.pdf` | PDF | Support officiel de soutenance orale (6 slides avec notes). |
 | `PRESENTATION_cliner-mlops.pptx` | PPTX | Support modifiable de présentation (16:9). |
+| `LIEN_REPO_GITHUB_CLINER_MLOPS.pdf` | PDF | Fiche officielle des liens GitHub, CI/CD, Terraform & URLs Cloud. |
+| `LIENS_GITHUB_ET_DEMO.txt` | TXT | Fichier texte des liens officiels pour dépôt Julie LMS (`CliNER_MLOps_Livrables_Bloc4.zip`). |
 
 Le code source complet, les Dockerfiles et les workflows GitHub Actions sont directement consultables sur le dépôt applicatif :  
 👉 **[https://github.com/Elkristobal59/cliner-mlops](https://github.com/Elkristobal59/cliner-mlops)**
+* **Workflows CI/CD GitHub Actions :** https://github.com/Elkristobal59/cliner-mlops/actions
+* **Application Web Streamlit (Render) :** https://cliner-mlops.onrender.com/
+* **Serveur MLflow & Model Registry (Cloud Run) :** https://mlflow-cliner-mlops-1054740171053.europe-west9.run.app

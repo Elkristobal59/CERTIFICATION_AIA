@@ -1,0 +1,12 @@
+CERTIFICATION ARCHITECTE IA (RNCP 41993 — BLOC 3 : PIPELINES DE DONNÉES POUR L'IA)
+Candidat : Christopher GILLERON
+Projet : Détection de Fraude Bancaire (Kafka KRaft, Pandera, FastAPI, MLflow AWS S3, Neon PostgreSQL & Apache Airflow)
+
+- Lien GitHub complet du code source et des livrables Bloc 3 :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/03_BLOC_3_PIPELINE_FRAUD_DETECTION
+
+- Lien GitHub du dépôt global RNCP 41993 :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA
+
+- Lien vers la vidéo de démonstration complète (Google Drive, 3 min 54 s) :
+  https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing

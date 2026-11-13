@@ -1,0 +1,25 @@
+CERTIFICATION ARCHITECTE EN INTELLIGENCE ARTIFICIELLE (RNCP 41993 — NIVEAU 7)
+Candidat : Christopher GILLERON
+
+======================================================================
+LIENS OFFICIELS GITHUB & DÉMONSTRATIONS (TOUS LES BLOCS)
+======================================================================
+
+- Dépôt GitHub principal (4 Blocs RNCP 41993) :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA
+
+- BLOC 1 (Gouvernance Data & IA — Spotify) :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/01_BLOC_1_GOUVERNANCE_SPOTIFY
+
+- BLOC 2 (Architecture Data & Calcul — Stripe) :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/02_BLOC_2_ARCHITECTURE_STRIPE
+
+- BLOC 3 (Pipelines Streaming Kafka & Batch Airflow — Fraud Detection) :
+  * Code GitHub : https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/03_BLOC_3_PIPELINE_FRAUD_DETECTION
+  * Vidéo Démo (Google Drive, 3 min 54 s) : https://drive.google.com/file/d/1nUORFhIksV191HoE_yuvA1I3GrJLSQNe/view?usp=sharing
+
+- BLOC 4 (Industrialisation & MLOps — CliNER-MLOps) :
+  * Code GitHub complet (API, UI, MLOps, Terraform, CI/CD) : https://github.com/Elkristobal59/cliner-mlops
+  * Support & Livrables sur repo AIA : https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/04_BLOC_4_MLOPS_CLINER
+  * Application Web Streamlit (Render) : https://cliner-mlops.onrender.com/
+  * Serveur MLflow Registry (Cloud Run) : https://mlflow-cliner-mlops-1054740171053.europe-west9.run.app

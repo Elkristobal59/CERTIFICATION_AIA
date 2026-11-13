@@ -1,0 +1,11 @@
+CERTIFICATION ARCHITECTE IA (RNCP 41993 — BLOC 2 : INFRASTRUCTURE DE DONNÉES & DE CALCUL POUR L'IA)
+Candidat : Christopher GILLERON
+Cas d'étude : Stripe
+
+- Lien GitHub du dossier Bloc 2 (rapports PDF, DBML, schémas & slides) :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/02_BLOC_2_ARCHITECTURE_STRIPE
+
+- Lien GitHub du dépôt global RNCP 41993 :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA
+
+Note : Ce bloc est un exercice à 100 % de conception d'architecture Data & Cloud AWS (OLTP 3NF, OLAP Étoile, NoSQL, CDC Kafka/Flink, FinOps) sans déploiement applicatif ni démonstration vidéo.

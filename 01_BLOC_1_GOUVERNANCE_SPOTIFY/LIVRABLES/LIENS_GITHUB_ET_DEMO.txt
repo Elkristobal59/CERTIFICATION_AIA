@@ -1,0 +1,11 @@
+CERTIFICATION ARCHITECTE IA (RNCP 41993 — BLOC 1 : GOUVERNANCE DES DONNÉES & DE L'IA)
+Candidat : Christopher GILLERON
+Cas d'étude : Spotify
+
+- Lien GitHub du dossier Bloc 1 (livrables & synthèse) :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA/tree/main/01_BLOC_1_GOUVERNANCE_SPOTIFY
+
+- Lien GitHub du dépôt global RNCP 41993 :
+  https://github.com/Elkristobal59/CERTIFICATION_AIA
+
+Note : Ce bloc porte sur la gouvernance stratégique (DMBOK, Gartner, RACI, RGPD/AI Act) et ne comporte pas de déploiement applicatif ni de démonstration vidéo.
