@@ -1,0 +1,19 @@
+{
+  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "peft_type": "LORA",
+  "r": 16,
+  "lora_alpha": 32,
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj"
+  ],
+  "lora_dropout": 0.05,
+  "train_loss": 0.284,
+  "val_f1_score": 0.583,
+  "val_precision": 0.63,
+  "retrained_at": "2026-09-21 14:28:21",
+  "adapter_size_mb": 84.2,
+  "version": "v2.1"
+}

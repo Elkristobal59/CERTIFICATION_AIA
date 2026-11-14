@@ -1,0 +1,719 @@
+"""
+Script : main.py (Le Cœur du Réacteur - Backend API)
+----------------------------------------------------
+Rôle : Exposer les fonctionnalités d'IA (RAG, Extraction) via des points d'accès HTTP (FastAPI) 
+pour que le front-end (Streamlit) puisse les interroger.
+
+Architecture Hybride du Système (RAG & LLMOps) :
+Ce script combine les composants clés du pipeline :
+1. FastAPI : Un serveur web ultra-rapide asynchrone.
+2. Transformers / vLLM : Pour charger les modèles d'IA en mémoire vidéo (VRAM).
+3. LangChain : Pour découper intelligemment les textes (Chunking).
+4. pgvector (Supabase) : La base de données vectorielle pour la recherche sémantique.
+5. MLflow : Pour monitorer en direct (tracking) les prompts, les réponses et la latence.
+
+Point fort : Nous utilisons `vLLM` si un GPU puissant est détecté. C'est un moteur d'inférence 
+qui gère la VRAM avec la technique "PagedAttention", rendant la génération de texte 2 à 5 fois plus rapide !
+"""
+
+import os
+import io
+import json
+import fitz  # PyMuPDF : Pour lire les PDF directement en mémoire sans les sauvegarder
+import psycopg2
+import torch
+import time
+import mlflow
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.responses import FileResponse, PlainTextResponse
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
+try:
+    from vllm import LLM, SamplingParams
+except ImportError:
+    pass
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from dotenv import load_dotenv
+
+from mlops_reentrainement.logger_config import (
+    get_logger,
+    export_execution_xml,
+    DEFAULT_LOG_FILE,
+    DEFAULT_XML_DIR
+)
+from mlops_reentrainement.monitoring_evidently import (
+    HTML_REPORT_PATH,
+    JSON_REPORT_PATH,
+    generate_drift_report
+)
+
+load_dotenv()
+
+logger = get_logger("cliner_api")
+
+app = FastAPI(
+    title="Clinical Trials AI Extraction API (Phase 3)",
+    description="API industrielle d'extraction NER clinique, RAG sémantique, traçabilité XML et monitoring Evidently AI.",
+    version="2.1.0"
+)
+
+# ---------------------------------------------------------
+# ⚙️ CONFIGURATION DES MODÈLES ET SERVICES
+# ---------------------------------------------------------
+SUPABASE_DB_URL = os.getenv("SUPABASE_DATABASE_URL")
+BIOBERT_MODEL = "dmis-lab/biobert-v1.1" # Modèle de NLP médical pour la recherche vectorielle (Retriever)
+QWEN_MODEL = "Qwen/Qwen2.5-7B-Instruct"  # LLM Génératif pour extraire le JSON (Generator)
+
+# Variables globales : On charge les modèles une seule fois au démarrage pour éviter de saturer la RAM.
+device = None
+biobert_tokenizer = None
+biobert_model = None
+qwen_tokenizer = None
+qwen_model = None
+conn = None
+is_vllm = False
+MEMORY_DOC_CHUNKS = {}  # doc_id -> list of {"text": chunk_text, "emb": embedding}
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    S'exécute automatiquement au lancement du serveur FastAPI (`uvicorn api.main:app`).
+    Charge les modèles lourds en RAM/VRAM une seule fois (Singleton pattern).
+    """
+    global device, biobert_tokenizer, biobert_model, qwen_tokenizer, qwen_model, conn, is_vllm
+    
+    print("Initialisation du pipeline sur GPU...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # 📥 CHARGEMENT DE QWEN (Modèle Lourd - 7 Milliards de paramètres)
+    print(f"Chargement {QWEN_MODEL} (LLM Génératif)...")
+    qwen_tokenizer = AutoTokenizer.from_pretrained(QWEN_MODEL)
+    
+    # 🚀 OPTIMISATION vLLM (Si GPU disponible)
+    # vLLM est une technologie d'inférence de pointe pour les LLMs. 
+    # Elle évite la fragmentation de la VRAM (PagedAttention).
+    if torch.cuda.is_available():
+        try:
+            print("GPU détecté -> Activation de vLLM (avec support LoRA)...")
+            # On réserve 85% de la VRAM au LLM, et on active le support LoRA
+            qwen_model = LLM(model=QWEN_MODEL, gpu_memory_utilization=0.85, max_model_len=4096, enable_lora=True)
+            is_vllm = True
+        except Exception as e:
+            print(f"Erreur vLLM, fallback transformers: {e}")
+            is_vllm = False
+            
+    # ⚡ CHARGEMENT TRANSFORMERS HAUTE PERFORMANCE (4-bit QLoRA)
+    if not is_vllm:
+        print("Activation de Transformers sur GPU (bitsandbytes 4-bit QLoRA)...")
+        from peft import PeftModel
+        from transformers import BitsAndBytesConfig
+        bnb_config = None
+        if torch.cuda.is_available():
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_quant_type="nf4"
+            )
+        base_model = AutoModelForCausalLM.from_pretrained(
+            QWEN_MODEL, 
+            quantization_config=bnb_config,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto" if torch.cuda.is_available() else None,
+            low_cpu_mem_usage=True
+        )
+        try:
+            qwen_model = PeftModel.from_pretrained(base_model, "Elkristobal59/qwen-7b-chia-ner")
+            print("✅ Adaptateur LoRA médical greffé avec succès sur Qwen-7B !")
+        except Exception as e:
+            print(f"Adapter not found on HF ({e}), using base model")
+            qwen_model = base_model
+
+    # 📥 CHARGEMENT DE BIOBERT (Modèle léger)
+    print(f"Chargement {BIOBERT_MODEL} (Embeddings)...")
+    biobert_tokenizer = AutoTokenizer.from_pretrained(BIOBERT_MODEL)
+    biobert_model = AutoModel.from_pretrained(BIOBERT_MODEL).to(device)
+    
+    # 🗄️ CONNEXION SUPABASE AVEC TOLÉRANCE AUX PANNES (SRE / Zero-Downtime)
+    try:
+        if SUPABASE_DB_URL:
+            print("Connexion Supabase (Base Vectorielle)...")
+            conn = psycopg2.connect(SUPABASE_DB_URL, connect_timeout=4)
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS clinical_ner_cache (
+                        doc_id TEXT PRIMARY KEY,
+                        disease TEXT,
+                        extraction TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                conn.commit()
+            print("Table de cache NER prête.")
+    except Exception as err_db:
+        print(f"[WARN] Base Supabase en pause ou indisponible ({err_db}). Basculement en mode local résilient.")
+        conn = None
+    
+    # 📊 MONITORING MLOPS AVEC MLFLOW
+    print("Configuration MLflow...")
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
+    if not tracking_uri:
+        db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mlflow.db"))
+        tracking_uri = f"sqlite:///{db_path}"
+    mlflow.set_tracking_uri(tracking_uri)
+    print(f"MLflow Tracking URI configuré sur : {tracking_uri}")
+    mlflow.set_experiment("Clinical_Trials_Extraction") # Tous nos logs iront dans cette "boîte"
+    
+    print("✅ Serveur Prêt. L'API est en ligne !")
+
+def get_biobert_embedding(text):
+    """
+    Transforme un texte médical (ex: "Patient adulte avec diabète") en 
+    Vecteur mathématique de 768 dimensions grâce à BioBERT.
+    Ce vecteur permettra de faire une recherche sémantique (similarité cosinus).
+    """
+    encoded_input = biobert_tokenizer(text, padding=True, truncation=True, return_tensors='pt', max_length=512)
+    encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
+    with torch.no_grad():
+        out = biobert_model(**encoded_input)
+    # "Mean pooling" : On fait la moyenne des vecteurs de chaque mot pour obtenir LE vecteur de la phrase entière
+    emb = torch.sum(out[0] * encoded_input['attention_mask'].unsqueeze(-1), 1) / torch.clamp(encoded_input['attention_mask'].sum(1, keepdim=True), min=1e-9)
+    emb = torch.nn.functional.normalize(emb, p=2, dim=1) # Normalisation pour la similarité cosinus (Vector Database)
+    return emb[0].cpu().tolist()
+
+@mlflow.trace(name="NER_Pipeline", span_type="CHAIN")
+def process_extracted_text(text: str, filename: str, disease: str, start_time: float) -> dict:
+    """
+    Le cœur du Pipeline RAG (Retrieval-Augmented Generation).
+    1. Découpe le texte (LangChain).
+    2. Vectorise et stocke (BioBERT -> Supabase pgvector).
+    3. Recherche les paragraphes les plus pertinents (Top 5).
+    4. Envoie ces 5 paragraphes au LLM (Qwen) pour extraire le JSON final.
+    """
+    cur = None
+    try:
+        # --- NOUVEAUTÉ: VÉRIFICATION DU CACHE NER (SI SUPABASE CONNECTÉ) ---
+        if conn is not None:
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT extraction FROM clinical_ner_cache WHERE doc_id = %s", (filename,))
+                cached_result = cur.fetchone()
+                cur.close()
+                cur = None
+                if cached_result:
+                    print(f"⚡ CACHE HIT pour {filename} ! Réponse instantanée en {time.time() - start_time:.2f}s.")
+                    try:
+                        with mlflow.start_run():
+                            mlflow.log_param("disease", disease)
+                            mlflow.log_param("document", filename)
+                            mlflow.log_param("cache_hit", True)
+                            mlflow.log_metric("latency_sec", time.time() - start_time)
+                    except Exception:
+                        pass
+                    return {"status": "success", "disease": disease, "document": filename, "extraction": cached_result[0]}
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        
+        # --- 1. CHUNKING (Découpage) ---
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, length_function=len)
+        chunks = text_splitter.split_text(text)
+        
+        # Ingestion mémoire locale pour résilience RAG (Zéro-Downtime)
+        doc_chunks_list = []
+        for c in chunks:
+            try:
+                emb = get_biobert_embedding(c)
+                doc_chunks_list.append({"text": c, "emb": emb})
+            except Exception:
+                doc_chunks_list.append({"text": c, "emb": None})
+        MEMORY_DOC_CHUNKS[filename] = doc_chunks_list
+        
+        # --- 2. INGESTION VECTORIELLE SUPABASE (OPTIONNELLE) ---
+        if conn is not None:
+            try:
+                conn.rollback()
+                cur = conn.cursor()
+                cur.execute("DELETE FROM clinical_trials_data_biobert WHERE doc_id = %s", (filename,))
+                for idx, chunk_text in enumerate(chunks):
+                    embedding = get_biobert_embedding(chunk_text)
+                    cur.execute("""
+                        INSERT INTO clinical_trials_data_biobert (doc_id, chunk_id, raw_text, embedding)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (chunk_id) DO NOTHING
+                    """, (filename, f"{filename}_chunk_{idx}", chunk_text, embedding))
+                conn.commit()
+                cur.close()
+                cur = None
+                print(f"Ingestion pgvector terminée pour {filename}.")
+            except Exception as e_ing:
+                print(f"[WARN] Ingestion pgvector ignorée : {e_ing}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        
+        # --- 3. RECHERCHE SEMANTIQUE (TOP 5 CHUNKS) ---
+        results = []
+        if conn is not None:
+            try:
+                cur = conn.cursor()
+                query = f"inclusion criteria medications {disease}"
+                query_emb = get_biobert_embedding(query)
+                cur.execute("""
+                    SELECT raw_text
+                    FROM clinical_trials_data_biobert
+                    WHERE doc_id = %s
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT 5;
+                """, (filename, query_emb))
+                results = cur.fetchall()
+                cur.close()
+                cur = None
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        
+        # Fallback mémoire résilient si base indisponible ou résultat vide
+        if not results:
+            results = [(c,) for c in chunks[:5]]
+            
+        context = "\n\n".join([f"Extrait:\n{r[0]}" for r in results])
+        
+        # --- 4. EXTRACTION JSON VIA LoRA (NER) ---
+        prompt = f"""Extract all relevant clinical entities from the following text and format them as JSON. The allowed entity types are: Condition, Drug, Procedure, Measurement, Value, Temporal, Observation, Person, Device.
+
+Text: {context}"""
+        messages = [
+            {"role": "system", "content": "You are a medical AI assistant specialized in clinical trial named entity recognition (NER). You extract key entities precisely and format them in JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        text_prompt = qwen_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        print(f"Génération Qwen (via LoRA NER) pour {disease}...")
+        
+        if is_vllm:
+            from vllm.lora.request import LoRARequest
+            sampling_params = SamplingParams(temperature=0.1, max_tokens=4096, repetition_penalty=1.15)
+            try:
+                lora_req = LoRARequest("chia_ner", 1, "Elkristobal59/qwen-7b-chia-ner")
+                outputs = qwen_model.generate([text_prompt], sampling_params, lora_request=lora_req)
+            except Exception as e:
+                print(f"Erreur chargement dynamique LoRA: {e}, fallback classique")
+                outputs = qwen_model.generate([text_prompt], sampling_params)
+            response_json = outputs[0].outputs[0].text
+        else:
+            model_inputs = qwen_tokenizer([text_prompt], return_tensors="pt").to(device)
+            with torch.no_grad():
+                generated_ids = qwen_model.generate(model_inputs.input_ids, max_new_tokens=4096, temperature=0.1, repetition_penalty=1.15)
+            generated_ids = [
+                output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+            ]
+            response_json = qwen_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            
+        latency = time.time() - start_time
+        
+        # --- 5. POST-PROCESSING (NER List -> API Dict) ---
+        # Le modèle NER génère une liste d'entités, mais l'API s'attend à un dictionnaire strict.
+        final_dict = {
+            "condition": disease,
+            "medications": [],
+            "inclusion_criteria": "Veuillez consulter le texte source pour les critères." # Le modèle NER ne gère pas ce champ global
+        }
+        
+        try:
+            clean_resp = response_json.strip()
+            if clean_resp.startswith("```json"):
+                clean_resp = clean_resp[7:]
+            if clean_resp.endswith("```"):
+                clean_resp = clean_resp[:-3]
+                
+            entities = json.loads(clean_resp)
+            for ent in entities:
+                if ent.get("label") == "Condition" and not final_dict["condition"]:
+                    final_dict["condition"] = ent.get("entity")
+                elif ent.get("label") == "Drug":
+                    final_dict["medications"].append(ent.get("entity"))
+        except Exception as e:
+            print(f"Erreur de parsing JSON NER: {e}")
+            
+        # Conversion du dictionnaire final en JSON string pour la réponse HTTP
+        final_json_str = json.dumps(final_dict, ensure_ascii=False)
+        
+        # --- ENREGISTREMENT DANS LE CACHE ---
+        if conn is not None:
+            try:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO clinical_ner_cache (doc_id, disease, extraction) 
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (doc_id) DO UPDATE SET extraction = EXCLUDED.extraction, disease = EXCLUDED.disease
+                """, (filename, disease, final_json_str))
+                conn.commit()
+                cur.close()
+                logger.info(f"💾 Sauvegarde en cache réussie pour {filename}.")
+            except Exception as e:
+                logger.warning(f"Erreur d'insertion cache : {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        
+        try:
+            mlflow.set_experiment("Clinical_Trials_Extraction")
+            with mlflow.start_run():
+                mlflow.log_param("disease", disease)
+                mlflow.log_param("document", filename)
+                mlflow.log_param("model", "Elkristobal59/qwen-7b-chia-ner")
+                mlflow.log_metric("latency_sec", latency)
+                mlflow.log_text(prompt, "prompt.txt")
+                mlflow.log_text(response_json, "ner_response_raw.json")
+        except Exception as err_mlflow:
+            logger.warning(f"Tracking MLflow NER non bloquant ({err_mlflow})")
+
+        # Journal XML médico-légal (HDS / RGPD)
+        try:
+            xml_path = export_execution_xml(
+                execution_id=f"ner_{filename}_{int(time.time())}",
+                status="SUCCESS",
+                stage="clinical_ner_extraction",
+                metrics={"latency_sec": round(latency, 4), "document": filename, "disease": disease},
+                details={"entities_count": len(final_dict.get("medications", [])) + (1 if final_dict.get("condition") else 0)}
+            )
+            logger.info(f"Journal XML d'exécution généré : {xml_path}")
+        except Exception as err_xml:
+            logger.warning(f"Impossible d'exporter le journal XML : {err_xml}")
+            
+        return {"status": "success", "disease": disease, "document": filename, "extraction": final_json_str}
+
+    except HTTPException:
+        raise  # Laisser passer les erreurs HTTP propres (404, etc.)
+    except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback() # Annule la transaction SQL en cas d'erreur grave
+            except Exception:
+                pass
+        logger.error(f"Erreur API process_extracted_text: {e}", exc_info=True)
+        try:
+            export_execution_xml(
+                execution_id=f"ner_err_{filename}_{int(time.time())}",
+                status="ERROR",
+                stage="clinical_ner_extraction",
+                metrics={"latency_sec": round(time.time() - start_time, 4)},
+                details={"error": str(e), "disease": disease, "document": filename}
+            )
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cur is not None:
+            try:
+                cur.close()
+            except:
+                pass
+
+
+@app.post("/process_text")
+async def process_text(
+    disease: str = Form(...),
+    document_id: str = Form(...),
+    text_content: str = Form(...)
+):
+    """
+    Route API (Point d'accès) #1 : Traitement direct de texte.
+    Optimisation majeure : Si on a déjà récupéré le texte propre depuis l'API ClinicalTrials,
+    on esquive toute l'étape d'extraction PyMuPDF !
+    """
+    start_time = time.time()
+    logger.info(f"Réception du texte direct pour l'essai {document_id}")
+    return process_extracted_text(text=text_content, filename=document_id, disease=disease, start_time=start_time)
+
+
+@app.post("/process_pdf")
+async def process_pdf(
+    file: UploadFile = File(...),
+    disease: str = Form(...)
+):
+    """
+    Route API (Point d'accès) #2 : Le Fallback historique (Traitement PDF).
+    1. Reçoit le PDF uploadé par l'utilisateur.
+    2. Sauvegarde le fichier brut dans Supabase Storage (Archivage).
+    3. Lit le PDF en mémoire via PyMuPDF (fitz) et lance le pipeline RAG.
+    """
+    start_time = time.time()
+    try:
+        # --- 1. LECTURE DU PDF EN MEMOIRE ---
+        # "await file.read()" -> On ne sauvegarde jamais le PDF sur le disque du serveur API. 
+        # C'est plus sécurisé et beaucoup plus rapide.
+        content = await file.read()
+        doc = fitz.open(stream=content, filetype="pdf")
+        text = ""
+        for page_num in range(len(doc)):
+            text += doc.load_page(page_num).get_text() + "\n"
+        doc.close()
+        
+        filename = file.filename.replace(".pdf", "")
+        logger.info(f"PDF {filename} reçu, extraction de texte terminée ({len(text)} caractères).")
+        
+        # --- 2. UPLOAD PDF SUR SUPABASE STORAGE (Archivage Cloud) ---
+        supa_url = os.getenv("SUPABASE_API_URL")
+        supa_key = os.getenv("SUPABASE_ANON_KEY")
+        if supa_url and supa_key:
+            try:
+                import requests
+                headers = {"Authorization": f"Bearer {supa_key}", "apikey": supa_key, "Content-Type": "application/pdf"}
+                # Upload dans le bucket sécurisé nommé 'clinical_pdfs'
+                res = requests.put(f"{supa_url}/storage/v1/object/clinical_pdfs/{file.filename}", data=content, headers=headers)
+                if res.status_code in [200, 201]:
+                    logger.info(f"PDF uploadé sur Supabase Storage: {file.filename}")
+                else:
+                    logger.warning(f"Erreur Supabase Storage ({res.status_code}): {res.text}")
+            except Exception as e:
+                logger.warning(f"Erreur lors de l'upload Supabase: {e}")
+                
+        # 3. Lancement du RAG
+        return process_extracted_text(text=text, filename=filename, disease=disease, start_time=start_time)
+
+    except Exception as e:
+        logger.error(f"Erreur lecture PDF: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat_rag")
+@mlflow.trace(name="RAG_Chatbot", span_type="CHAIN")
+async def chat_rag(question: str = Form(...), doc_id: str = Form(None), doc_ids: str = Form(None)):
+    """
+    Route API (Point d'accès) #3 : Le Chatbot Conversationnel RAG (Retrieval-Augmented Generation).
+    Permet à l'utilisateur de poser une question libre en langage naturel à l'IA.
+    - doc_id   : recherche ciblée sur UN seul essai (mode "Filtrer par essai")
+    - doc_ids  : liste de NCT séparés par des virgules (mode "Toute la base" scopé à la session)
+    """
+    cur = None
+    start_time = time.time()
+    try:
+        # 1. On vectorise la question de l'utilisateur (BioBERT)
+        query_emb = get_biobert_embedding(question)
+        
+        results = []
+        if conn is not None:
+            try:
+                conn.rollback()
+                cur = conn.cursor()
+                
+                # 2. On interroge Supabase (Recherche des paragraphes les plus pertinents)
+                if doc_id:
+                    cur.execute("""
+                        SELECT doc_id, raw_text FROM clinical_trials_data_biobert
+                        WHERE doc_id = %s
+                        ORDER BY embedding <=> %s::vector LIMIT 15;
+                    """, (doc_id, query_emb))
+                elif doc_ids:
+                    session_doc_ids = [d.strip() for d in doc_ids.split(",") if d.strip()]
+                    cur.execute("""
+                        SELECT doc_id, raw_text FROM clinical_trials_data_biobert
+                        WHERE doc_id = ANY(%s)
+                        ORDER BY embedding <=> %s::vector LIMIT 15;
+                    """, (session_doc_ids, query_emb))
+                else:
+                    cur.execute("""
+                        SELECT doc_id, raw_text FROM clinical_trials_data_biobert
+                        ORDER BY embedding <=> %s::vector LIMIT 15;
+                    """, (query_emb,))
+                    
+                results = cur.fetchall()
+                cur.close()
+                cur = None
+            except Exception as e_sql:
+                logger.warning(f"Erreur requête Supabase dans chat_rag : {e_sql}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        # 2.bis Fallback RAG mémoire si Supabase est indisponible ou vide
+        if not results and MEMORY_DOC_CHUNKS:
+            try:
+                import numpy as np
+                q_vec = np.array(query_emb, dtype=np.float32)
+                q_norm = float(np.linalg.norm(q_vec)) + 1e-9
+                target_docs = [doc_id] if doc_id else ([d.strip() for d in doc_ids.split(",") if d.strip()] if doc_ids else list(MEMORY_DOC_CHUNKS.keys()))
+                scored_chunks = []
+                for did in target_docs:
+                    if did in MEMORY_DOC_CHUNKS:
+                        for item in MEMORY_DOC_CHUNKS[did]:
+                            if item.get("emb"):
+                                c_vec = np.array(item["emb"], dtype=np.float32)
+                                c_norm = float(np.linalg.norm(c_vec)) + 1e-9
+                                sim = float(np.dot(q_vec, c_vec) / (q_norm * c_norm))
+                            else:
+                                sim = 0.0
+                            scored_chunks.append((sim, did, item["text"]))
+                scored_chunks.sort(key=lambda x: x[0], reverse=True)
+                results = [(did, txt) for _, did, txt in scored_chunks[:15]]
+            except Exception as err_mem:
+                logger.warning(f"Erreur recherche RAG mémoire : {err_mem}")
+            
+        if not results:
+            return {"answer": "Je n'ai pas trouvé d'informations pertinentes dans les essais cliniques sélectionnés.", "context": []}
+            
+        # 3. NOUVEAU FORMATAGE PLUS CLAIR POUR L'IA (Séparation des documents) :
+        context_parts = []
+        for i, r in enumerate(results, 1):
+            nom_document = r[0]
+            texte_extrait = r[1]
+            context_parts.append(f"--- EXTRAIT N°{i} DE L'ESSAI : {nom_document} ---\n{texte_extrait}\n-----------------------------------")
+        
+        context = "\n\n".join(context_parts)
+        
+        # 4. Construction du Prompt : On donne le contexte (les extraits) ET la question (User) au LLM
+        prompt = f"""Tu es un assistant médical expert. Voici {len(results)} essais cliniques distincts extraits de notre base de données.
+Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur ces {len(results)} documents. 
+Si l'information n'y figure pas, dis-le clairement. Tu dois répondre en Français.
+
+CONTEXTE MÉDICAL:
+{context}
+
+QUESTION: {question}
+RÉPONSE:"""
+
+        messages = [
+            {"role": "system", "content": "Tu es un assistant IA médical expert, francophone, précis et factuel."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        text_prompt = qwen_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        logger.info(f"Génération RAG pour: {question[:80]}...")
+        
+        # 4. Génération de la réponse (Qwen)
+        if is_vllm:
+            # vLLM
+            sampling_params = SamplingParams(temperature=0.3, max_tokens=512, repetition_penalty=1.1)
+            outputs = qwen_model.generate([text_prompt], sampling_params)
+            answer = outputs[0].outputs[0].text
+        else:
+            # Transformers fallback
+            model_inputs = qwen_tokenizer([text_prompt], return_tensors="pt").to(device)
+            with torch.no_grad():
+                generated_ids = qwen_model.generate(model_inputs.input_ids, max_new_tokens=512, temperature=0.3, repetition_penalty=1.1)
+            generated_ids = [
+                output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+            ]
+            answer = qwen_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        
+        latency = time.time() - start_time
+        
+        # 5. Monitoring MLflow (Tolérant au Scale-to-Zero Cloud Run)
+        try:
+            mlflow.set_experiment("Clinical_Trials_Extraction")
+            with mlflow.start_run():
+                mlflow.log_param("task", "chat_rag")
+                mlflow.log_param("doc_id", doc_id)
+                mlflow.log_param("doc_ids", doc_ids)
+                mlflow.log_param("question", question)
+                mlflow.log_metric("latency_sec", latency)
+                mlflow.log_text(prompt, "rag_prompt.txt")
+                mlflow.log_text(answer, "rag_response.txt")
+        except Exception as err_mlflow:
+            logger.warning(f"Tracking MLflow RAG non bloquant ({err_mlflow})")
+
+        # 6. Journal XML médico-légal (HDS / RGPD)
+        try:
+            xml_path = export_execution_xml(
+                execution_id=f"rag_{int(time.time())}",
+                status="SUCCESS",
+                stage="rag_conversation",
+                metrics={"latency_sec": round(latency, 4), "results_count": len(results)},
+                details={"question": question[:120], "doc_id": doc_id or "all"}
+            )
+            logger.info(f"Journal XML RAG généré : {xml_path}")
+        except Exception as err_xml:
+            logger.warning(f"Impossible d'exporter le journal XML RAG : {err_xml}")
+            
+        return {"answer": answer, "context": [r[0] for r in results]}
+
+    except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        logger.error(f"Erreur RAG API: {e}", exc_info=True)
+        try:
+            export_execution_xml(
+                execution_id=f"rag_err_{int(time.time())}",
+                status="ERROR",
+                stage="rag_conversation",
+                metrics={"latency_sec": round(time.time() - start_time, 4)},
+                details={"error": str(e), "question": question[:120]}
+            )
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cur is not None:
+            try: cur.close()
+            except: pass
+
+
+# ---------------------------------------------------------
+# 📊 ROUTES DE MONITORING ET AUDITABILITÉ (RNCP 41993 - BLOC 4)
+# ---------------------------------------------------------
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "device": str(device),
+        "vllm_enabled": is_vllm,
+        "supabase_connected": conn is not None
+    }
+
+
+@app.get("/logs", response_class=PlainTextResponse)
+def get_logs(lines: int = 100):
+    """
+    Exposition des logs applicatifs récents (Stéphane Robert - Standard Python Logging).
+    Permet un diagnostic instantané en production sans accès SSH à la machine.
+    """
+    log_file = DEFAULT_LOG_FILE
+    if not os.path.exists(log_file):
+        return "Aucun fichier de log disponible."
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.readlines()
+            tail_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            return "".join(tail_lines)
+    except Exception as e:
+        logger.error(f"Erreur lecture logs: {e}")
+        return f"Erreur lors de la lecture des logs : {e}"
+
+
+@app.get("/logs/xml")
+def get_latest_xml_log():
+    """
+    Récupère le dernier journal d'audit médico-légal au format XML.
+    Conforme aux exigences d'auditabilité HDS / RGPD pour la traçabilité des exécutions.
+    """
+    latest_xml = os.path.join(DEFAULT_XML_DIR, "latest_execution.xml")
+    if not os.path.exists(latest_xml):
+        raise HTTPException(status_code=404, detail="Aucun journal XML d'exécution disponible.")
+    return FileResponse(latest_xml, media_type="application/xml", filename="latest_execution.xml")
+
+
+@app.get("/monitoring/drift-report")
+def get_drift_report(force_regenerate: bool = False):
+    """
+    Accès au rapport visuel Evidently AI de détection de Data Drift (HTML).
+    Couplé à MLflow pour le suivi de dérive des données de production vs référence CHIA.
+    """
+    if force_regenerate or not os.path.exists(HTML_REPORT_PATH):
+        logger.info("Régénération à la volée du rapport de Drift Evidently AI...")
+        generate_drift_report()
+        
+    if not os.path.exists(HTML_REPORT_PATH):
+        raise HTTPException(status_code=404, detail="Rapport de drift HTML introuvable.")
+    return FileResponse(HTML_REPORT_PATH, media_type="text/html")

@@ -1,0 +1,49 @@
+================================================================================
+CODE DEPLOIEMENT, INFRASTRUCTURE & CI/CD — PROJET CliNER-MLOps (RNCP 41993 - BLOC 4)
+Candidat : Christopher GILLERON
+Depot GitHub complet : https://github.com/Elkristobal59/cliner-mlops
+Workflows GitHub Actions : https://github.com/Elkristobal59/cliner-mlops/actions
+Application Web Production (Render) : https://cliner-mlops.onrender.com/
+Serveur MLflow (Google Cloud Run) : https://mlflow-cliner-mlops-1054740171053.europe-west9.run.app
+================================================================================
+
+Ce dossier rassemble l'ensemble du code ayant permis le deploiement,
+l'industrialisation MLOps et le pipeline CI/CD de la solution CliNER-MLOps :
+
+1. Pipelines CI/CD GitHub Actions (.github/workflows/)
+   - ci_mlops.yml : Lint Flake8, suite PyTest, simulation Continuous Training
+     (--dry-run) avec MLflow, build Docker (cliner-frontend & cliner-mlops-worker)
+     et push Docker Hub conditionnel sur main.
+   - weekly_mlops_pipeline.yml : Surveillance hebdomadaire (Evidently AI + derive
+     Wasserstein sur embeddings BioBERT), reentrainement QLoRA sur EC2 GPU et
+     publication du rapport HTML en artifact GitHub.
+   - deploy_ec2_autokill.yml : Demarrage a la demande de l'instance EC2 GPU
+     g4dn.xlarge avec minuteur et Auto-Kill FinOps garanti (if: always()).
+
+2. Conteneurisation & Serving API (racine + api/)
+   - Dockerfile & .dockerignore : Image frontend Streamlit + Chromium Playwright.
+   - mlops_reentrainement/Dockerfile & requirements_mlops.txt : Worker MLOps GPU.
+   - docker-compose.yml & .env.example : Orchestration locale et variables requises.
+   - api/main.py : API REST FastAPI (7 endpoints Swagger /docs).
+   - requirements.txt & requirements-frontend.txt : Dependances Python figees.
+
+3. Infrastructure as Code (terraform/)
+   - main.tf, variables.tf, outputs.tf, schema.sql : Provisioning reproductible
+     Supabase PostgreSQL + pgvector + pg_cron, Bucket AWS S3 versionne/chiffre
+     AES-256 et instance EC2 GPU T4 (g4dn.xlarge) avec Security Group.
+   - README_AWS_EC2.md : Procedure d'exploitation FinOps sur AWS EC2 GPU.
+
+4. Pipeline MLOps Continuous Training & Drift (mlops_reentrainement/ + racine)
+   - run_pipeline.py : Orchestrateur E2E (Drift -> LoRA -> MLflow -> S3 -> Auto-Kill).
+   - drift_detection.py : Distance de Wasserstein sur embeddings BioBERT (seuil 0.08).
+   - monitoring_evidently.py & push_to_evidently_dashboard.py : Rapports Evidently AI.
+   - finetune_lora.py : Reentrainement QLoRA 4-bit (PEFT) et tracking MLflow.
+   - ec2_manager.py : Demarrage/arret automatique AWS EC2 GPU via boto3 (FinOps).
+   - s3_storage.py : Versionnage des modeles LoRA sur AWS S3 et rollback.
+   - logger_config.py, README.md, scheduler.md : Journalisation et documentation.
+
+5. Quality Gate CI (tests/)
+   - test_mlops_pipeline.py : Tests unitaires et d'integration PyTest executes en CI.
+
+Note securite : Aucun fichier sensible (.env, .pem, cles IAM CSV) n'est inclus.
+Toutes les cles et secrets sont injectes via GitHub Secrets / variables d'environnement.

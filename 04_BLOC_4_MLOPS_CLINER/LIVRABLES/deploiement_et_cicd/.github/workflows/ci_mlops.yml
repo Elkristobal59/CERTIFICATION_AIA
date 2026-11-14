@@ -1,0 +1,83 @@
+name: CI/CD & MLOps Pipeline Quality Gate
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 📦 Install Test & MLOps Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest flake8 numpy scipy pandas boto3 mlflow psycopg2-binary python-dotenv
+
+      - name: 🔍 Syntax & Lint Check
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F821 --show-source --statistics --exclude=.git,__pycache__,docs,data,models,scripts,_scratch_scripts
+
+      - name: 🧪 Run Automated PyTest Suite (Unit & Integration Tests)
+        run: |
+          pytest tests/ -v
+
+      - name: 🚀 Run MLOps Continuous Training Pipeline (Simulation & Quality Gate)
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'eu-west-3' }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME || 'cliner-mlops' }}
+        run: |
+          python mlops_reentrainement/run_pipeline.py --dry-run --force-retrain
+
+  docker-build:
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Docker Build Streamlit Frontend
+        run: |
+          docker build -t cliner-frontend:latest .
+
+      - name: 🐳 Docker Build MLOps Retraining Worker
+        run: |
+          docker build -t cliner-mlops-worker:latest mlops_reentrainement/
+
+      - name: 🔐 Login to Docker Hub (if configured)
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: env.DH_USER != '' && env.DH_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🚀 Push Images to Docker Hub (if authenticated)
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: env.DH_USER != '' && env.DH_TOKEN != ''
+        run: |
+          docker tag cliner-frontend:latest ${{ secrets.DOCKERHUB_USERNAME }}/cliner-frontend:latest
+          docker tag cliner-mlops-worker:latest ${{ secrets.DOCKERHUB_USERNAME }}/cliner-mlops-worker:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cliner-frontend:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cliner-mlops-worker:latest
+
