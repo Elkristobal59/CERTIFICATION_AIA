@@ -60,4 +60,5 @@ Tous les livrables d'ingénierie sont regroupés au format PDF, DBML/PNG et PPTX
 | `sql/stripe_oltp.dbml` & `sql/stripe_olap.dbml` | DBML | Code source DBML des modèles relationnel (OLTP) et décisionnel (OLAP). |
 | `sql/stripe_oltp_olap.sql` | SQL | Script DDL complet PostgreSQL / Redshift (OLTP + OLAP). |
 | `stripe_oltp_erd.png` & `stripe_olap_schema.png` | PNG | Diagrammes graphiques haute résolution des schémas de données. |
+| `diagrams/stripe_oltp_olap.png` & `diagrams/stripe_oltp_olap.pdf` | PNG / PDF | Vue consolidée combinée OLTP + OLAP (format identique au modèle de référence). |
 | `Stripe_Dossier_Livrables_Bloc2.zip` | ZIP | Archive officielle consolidée sans doublons `.md` pour dépôt Julie LMS. |
