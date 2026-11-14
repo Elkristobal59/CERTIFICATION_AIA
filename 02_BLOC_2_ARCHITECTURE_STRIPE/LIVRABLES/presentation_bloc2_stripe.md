@@ -1,4 +1,4 @@
-# 🧾 Stripe – Correction complète du projet
+# 🧾 Stripe – Architecture Complète de Données (Bloc 2)
 
 > Architecture complète de données (OLTP, OLAP, NoSQL, Pipelines, Sécurité, ML) conçue pour répondre aux besoins transactionnels, analytiques et temps réel de Stripe.
 
