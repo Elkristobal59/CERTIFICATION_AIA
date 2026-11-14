@@ -14,7 +14,7 @@ Le code source complet de la solution d'IA médicale, les conteneurs Docker et l
 Ce dépôt comprend notamment :
 * **Workflows CI/CD GitHub Actions :**
   * `ci_mlops.yml` : Validation de la qualité de code (Flake8), 11 tests unitaires/intégration (PyTest), simulation Continuous Training LoRA sur MLflow et construction des images Docker (`cliner-frontend`, `cliner-mlops-worker`).
-  * `weekly_mlops_pipeline.yml` : Cron hebdomadaire (Lundi 02h00 UTC) mesurant la dérive Wasserstein + rapport Evidently AI et déclenchant le réentraînement LoRA si $W > 0.08$.
+  * `weekly_mlops_pipeline.yml` : Pipeline MLOps de surveillance et réentraînement (`workflow_dispatch` avec modes `dry-run` / `live`) mesurant la dérive Wasserstein + rapport Evidently AI et déclenchant le réentraînement LoRA sur AWS EC2 si $W > 0.08$.
   * `deploy_ec2_autokill.yml` : Déclenchement manuel à la demande de l'instance AWS EC2 GPU avec minuteur et Auto-Kill FinOps garanti (`if: always()`).
 * **Architecture applicative :**
   * Frontend Streamlit conteneurisé.
@@ -39,7 +39,7 @@ Ce dépôt comprend notamment :
    * L'instance GPU AWS (`g4dn.xlarge`, Nvidia T4) est allumée à la demande via `boto3` pour le réentraînement, puis arrêtée automatiquement à la fin du run, limitant la dépense au strict temps de calcul effectif.
 4. **Registry et Traçabilité des Modèles (MLflow) :**
    * Suivi des métriques (F1-score par entité clinique, perte de validation).
-   * Promotion en `Production` conditionnée au dépassement des performances du modèle en place sur un jeu de référence Gold Standard.
+   * Enregistrement de la version dans le Model Registry (`cliner-qwen-7b-lora`) et promotion via l'alias `@champion` après validation du run de réentraînement.
 
 ---
 
