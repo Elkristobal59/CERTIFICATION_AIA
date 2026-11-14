@@ -52,6 +52,7 @@ Ce dépôt comprend notamment :
 | `RAPPORT_DATASET_ET_PRETRAITEMENT.pdf` | PDF | Rapport synthétique Dataset CHIA, prétraitement anti-fuite, entraînement QLoRA & évaluation. |
 | `DOCUMENTATION_API_CLINER.pdf` | PDF | Documentation API REST FastAPI (7 endpoints, payloads & exemples `curl`). |
 | `SCHEMA_ARCHITECTURE_MLOPS_CLINER.png` | PNG | Schéma visuel du pipeline MLOps (Flux Inférence + Flux Continuous Training / Auto-Kill). |
+| `clinermlops_demo_video.mp4` | MP4 | Capture vidéo de la solution CliNER-MLOps en environnement de production. |
 | `LIEN_REPO_GITHUB_CLINER_MLOPS.pdf` | PDF | Fiche officielle des liens GitHub, CI/CD, Terraform & URLs Cloud. |
 | `LIENS_GITHUB_ET_DEMO.txt` | TXT | Fichier texte des liens officiels pour dépôt Julie LMS (`CliNER_MLOps_Livrables_Bloc4.zip`). |
 | `deploiement_et_cicd/` | Code | Code complet du déploiement et du pipeline CI/CD (`.github/workflows/`, `Dockerfile`, `docker-compose.yml`, `terraform/`, `api/`, `mlops_reentrainement/`, `tests/`). |

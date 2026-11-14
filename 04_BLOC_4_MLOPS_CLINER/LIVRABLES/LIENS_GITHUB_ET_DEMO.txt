@@ -16,3 +16,6 @@ Projet : CliNER-MLOps (Clinical NER RAG BioBERT + Qwen2.5-7B QLoRA + Drift Wasse
 
 - Serveur MLflow & Model Registry (Google Cloud Run) :
   https://mlflow-cliner-mlops-1054740171053.europe-west9.run.app
+
+- Vidéo de démonstration en production (incluse dans le ZIP Bloc 4) :
+  clinermlops_demo_video.mp4
