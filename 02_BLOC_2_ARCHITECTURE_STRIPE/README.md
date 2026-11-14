@@ -56,7 +56,8 @@ Tous les livrables d'ingénierie sont regroupés au format PDF, DBML/PNG et PPTX
 | `06_Security_Compliance_Plan.pdf` | PDF | Tokenisation CloudHSM, conformité PCI-DSS/RGPD/CCPA, audit automatisé Security Hub/Macie et FinOps. |
 | `07_ML_Integration_Strategy.pdf` | PDF | Intégration ML↔NoSQL, budget < 100 ms Radar, personnalisation Adaptive Checkout et prédictif Smart Retries. |
 | `08_SQL_NoSQL_Queries.pdf` | PDF | 6 requêtes SQL OLAP (GPV, échecs, chargebacks, cohortes, RFM CCPA, produit) et 5 pipelines NoSQL. |
-| `PRESENTATION_STRIPE_BLOC2.pptx` | PPTX | Support officiel de soutenance orale (6 slides avec notes d'orateur). |
-| `stripe_oltp.dbml` & `stripe_olap.dbml` | DBML | Code source DBML des modèles relationnel (OLTP) et décisionnel (OLAP). |
+| `presentation_bloc2_stripe.pdf` | PDF | Support consolidé de soutenance orale (présentation complète Bloc 2). |
+| `sql/stripe_oltp.dbml` & `sql/stripe_olap.dbml` | DBML | Code source DBML des modèles relationnel (OLTP) et décisionnel (OLAP). |
+| `sql/stripe_oltp_olap.sql` | SQL | Script DDL complet PostgreSQL / Redshift (OLTP + OLAP). |
 | `stripe_oltp_erd.png` & `stripe_olap_schema.png` | PNG | Diagrammes graphiques haute résolution des schémas de données. |
 | `Stripe_Dossier_Livrables_Bloc2.zip` | ZIP | Archive officielle consolidée sans doublons `.md` pour dépôt Julie LMS. |

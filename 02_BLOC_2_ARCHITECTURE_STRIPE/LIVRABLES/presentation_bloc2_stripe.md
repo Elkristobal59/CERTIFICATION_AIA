@@ -50,7 +50,7 @@ Le modèle OLTP est **normalisé jusqu'à la 3e forme normale (3NF)** pour évit
 
 ![ERD Stripe OLTP](stripe_oltp_erd.png)
 
-> Source DBML importable dans `dbdiagram.io` : [`stripe_oltp.dbml`](stripe_oltp.dbml) · DDL PostgreSQL : [`sql/stripe_oltp_olap.sql`](sql/stripe_oltp_olap.sql)
+> Source DBML importable dans `dbdiagram.io` : [`sql/stripe_oltp.dbml`](sql/stripe_oltp.dbml) · DDL PostgreSQL : [`sql/stripe_oltp_olap.sql`](sql/stripe_oltp_olap.sql)
 
 **Justification :**
 
@@ -66,7 +66,7 @@ Le modèle analytique utilise un **schéma en étoile (Star Schema)** sur Data W
 
 ![Schéma en étoile OLAP Stripe](diagrams/png/03_star_schema.png)
 
-> Vue complète avec toutes les colonnes et types : [`stripe_olap_schema.png`](stripe_olap_schema.png) · Source DBML : [`stripe_olap.dbml`](stripe_olap.dbml)
+> Vue complète avec toutes les colonnes et types : [`stripe_olap_schema.png`](stripe_olap_schema.png) · Source DBML : [`sql/stripe_olap.dbml`](sql/stripe_olap.dbml)
 
 ### 🔹 Tables de dimensions
 
@@ -400,8 +400,8 @@ Résultat attendu : classement des thèmes d'irritation par volume de plaintes a
 | [`diagrams/png/03_star_schema.png`](diagrams/png/03_star_schema.png) | Schéma en étoile `FactTransactions` |
 | [`diagrams/png/04_oltp_olap_nosql.png`](diagrams/png/04_oltp_olap_nosql.png) | Articulation des 3 stockages (OLTP / OLAP / NoSQL) |
 | [`diagrams/png/08_ml_pipeline.png`](diagrams/png/08_ml_pipeline.png) | Chaîne ML : Feature Store Redis → entraînement → registry → monitoring |
-| [`stripe_oltp_erd.png`](stripe_oltp_erd.png) | ERD complet OLTP 3NF (`dbdiagram.io` / [`stripe_oltp.dbml`](stripe_oltp.dbml)) |
-| [`stripe_olap_schema.png`](stripe_olap_schema.png) | Schéma complet OLAP (`dbdiagram.io` / [`stripe_olap.dbml`](stripe_olap.dbml)) |
+| [`stripe_oltp_erd.png`](stripe_oltp_erd.png) | ERD complet OLTP 3NF (`dbdiagram.io` / [`sql/stripe_oltp.dbml`](sql/stripe_oltp.dbml)) |
+| [`stripe_olap_schema.png`](stripe_olap_schema.png) | Schéma complet OLAP (`dbdiagram.io` / [`sql/stripe_olap.dbml`](sql/stripe_olap.dbml)) |
 
 ---
 
