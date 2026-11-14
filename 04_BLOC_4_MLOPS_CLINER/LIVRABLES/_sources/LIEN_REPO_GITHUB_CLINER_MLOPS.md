@@ -25,4 +25,4 @@
 * **`mlops_reentrainement/` :** Détection non supervisée de dérive par distance de **Wasserstein (`W₁ > 0.08`)** sur embeddings **BioBERT**, rapports **Evidently AI**, réentraînement **QLoRA 4-bit (~84 Mo)**, suivi **MLflow**, versionnage/rollback **AWS S3** et protocole **Auto-Kill EC2 (`g4dn.xlarge`)**.
 * **`terraform/` :** Provisioning *Infrastructure as Code* (`main.tf`, `variables.tf`, `outputs.tf`, `schema.sql` — AWS S3 & PostgreSQL Supabase `pgvector`).
 * **`.github/workflows/` :** Automatisation CI/CD (`ci_mlops.yml`), pipeline hebdomadaire (`weekly_mlops_pipeline.yml`) et orchestration EC2 FinOps (`deploy_ec2_autokill.yml`).
-* **`tests/test_mlops_pipeline.py` :** Suite automatisée **PyTest** (11 tests unitaires et d'intégration).
+* **`tests/test_mlops_pipeline.py` :** Suite automatisée **PyTest** (5 tests unitaires et d'intégration).
